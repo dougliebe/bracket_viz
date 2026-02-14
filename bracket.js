@@ -226,8 +226,45 @@ function main(teams) {
     });
   }
 
+  function getTeamsInSubtree(node) {
+    var teams = {};
+    if (!node) return teams;
+    if (node.round === 1 && node.team) {
+      teams[node.team.name] = true;
+      return teams;
+    }
+    var children = node.children || [];
+    for (var i = 0; i < children.length; i++) {
+      var sub = getTeamsInSubtree(children[i]);
+      for (var t in sub) teams[t] = true;
+    }
+    return teams;
+  }
+
+  function getSibling(node) {
+    if (!node || !node.parent) return null;
+    var children = node.parent.children || [];
+    return children[0] === node ? children[1] : children[0];
+  }
+
+  function clipConflictingSelections(advancingGame) {
+    var parent = advancingGame.parent;
+    if (!parent) return;
+    var sibling = getSibling(advancingGame);
+    var losingTeams = getTeamsInSubtree(sibling);
+
+    var node = parent;
+    while (node) {
+      if (node.team && losingTeams[node.team.name]) {
+        node.team = undefined;
+      }
+      node = node.parent;
+    }
+  }
+
   function advanceTeam(game) {
     if (!game || !game.team || !game.parent) return;
+    clipConflictingSelections(game);
     game.parent.team = game.team;
     updateDisplay();
     updateLogos();
