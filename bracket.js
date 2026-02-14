@@ -517,6 +517,25 @@ function main(teams, size) {
     if (window.bracketReset) window.bracketReset();
   };
 
+  var randomBtn = document.getElementById('randomBtn');
+  if (randomBtn) randomBtn.onclick = function() {
+    if (window.bracketRandom) window.bracketRandom();
+  };
+
+  window.bracketRandom = function() {
+    window.bracketReset();
+    var nodesWithChildren = allNodes.filter(function(n) {
+      return n.children && n.children.length > 0;
+    });
+    nodesWithChildren.sort(function(a, b) { return a.round - b.round; });
+    nodesWithChildren.forEach(function(node) {
+      var idx = Math.random() < 0.5 ? 0 : 1;
+      node.team = node.children[idx].team;
+    });
+    updateDisplay();
+    updateLogos();
+  };
+
   window.bracketReset = function() {
     function clearWinners(node) {
       var hasChildren = node.children && node.children.length > 0;
