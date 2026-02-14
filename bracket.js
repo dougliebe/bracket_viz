@@ -10,7 +10,7 @@ var DEFAULT_TEAM_COLOR = [66, 133, 244]; // blue
 var SIZE_CONFIG = {
   64: { startRound: 1, leafGids: [1, 64] },
   32: { startRound: 2, leafGids: [65, 96] },
-  16: { startRound: 3, leafGids: [97, 104] },
+  16: { startRound: 3, leafGids: [97, 112] },
   8: { startRound: 4, leafGids: [113, 120] },
   4: { startRound: 5, leafGids: [121, 124] }
 };
