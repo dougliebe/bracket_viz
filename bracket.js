@@ -237,10 +237,11 @@ function main(teams, size) {
         .attr("x", 0)
         .attr("y", 0)
         .attr("text-anchor", "middle")
+        .style("font-weight", "bold")
         .style("fill", "#333")
-        .attr("id", "teamname")
-        .text(game.team.name);
-      d3.selectAll("#game127 .logo").style("opacity", "0.15");
+        .attr("id", "teamname");
+        // .text(game.team.name);
+      // d3.selectAll("#game127 .logo").style("opacity", "0.15");
     }
   }
 
@@ -404,7 +405,8 @@ function main(teams, size) {
               .attr("dominant-baseline", "central")
               .attr("x", c[0])
               .attr("y", c[1])
-              .style("font-size", "9px")
+              .style("font-size", "16px")
+              .style("font-weight", "bold")
               .style("fill", "#333")
               .text(teamName);
           });
@@ -458,7 +460,8 @@ function main(teams, size) {
           .attr("dominant-baseline", "central")
           .attr("x", c[0])
           .attr("y", c[1])
-          .style("font-size", "9px")
+          .style("font-size", "16px")
+          .style("font-weight", "bold")
           .style("fill", "#333")
           .text(d.team.name);
       });
