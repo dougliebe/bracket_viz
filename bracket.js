@@ -329,8 +329,27 @@ function main(teams, size) {
 
   function advanceTeam(game) {
     if (!game || !game.team || !game.parent) return;
-    clipConflictingSelections(game);
-    game.parent.team = game.team;
+    var parent = game.parent;
+    var isResetting = parent.team && parent.team.name === game.team.name;
+    if (isResetting) {
+      var node = parent;
+      while (node) {
+        if (node.team && node.team.name === game.team.name) {
+          node.team = undefined;
+        }
+        node = node.parent;
+      }
+    } else {
+      clipConflictingSelections(game);
+      parent.team = game.team;
+      var node = parent.parent;
+      while (node) {
+        if (node.team && node.team.name === game.team.name) {
+          node.team = undefined;
+        }
+        node = node.parent;
+      }
+    }
     updateDisplay();
     updateLogos();
   }
@@ -338,7 +357,15 @@ function main(teams, size) {
   function arcCenter(d) {
     if (d.x == null || d.dx == null || d.y == null || d.dy == null) return [0, 0];
     var midAngle = d.x + d.dx / 2;
-    var midRadius = d.y + d.dy / 2;
+    var r1 = d.y, r2 = d.y + d.dy;
+    var theta = d.dx;
+    var midRadius;
+    if (theta < 1e-6) {
+      midRadius = (r1 + r2) / 2;
+    } else {
+      var r2s = r2 * r2, r1s = r1 * r1, r2c = r2s * r2, r1c = r1s * r1;
+      midRadius = (4 * Math.sin(theta / 2) * (r2c - r1c)) / (3 * theta * (r2s - r1s));
+    }
     var x = midRadius * Math.sin(midAngle);
     var y = -midRadius * Math.cos(midAngle);
     var multipliers = { 4: 1.03, 5: 1.15, 6: 1.4, 7: 1.2 };
@@ -470,7 +497,8 @@ function main(teams, size) {
 
   window.bracketReset = function() {
     function clearWinners(node) {
-      if (node.round > 1) node.team = undefined;
+      var hasChildren = node.children && node.children.length > 0;
+      if (hasChildren) node.team = undefined;
       if (node.children) {
         node.children.forEach(clearWinners);
       }
