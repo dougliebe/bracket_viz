@@ -7,6 +7,17 @@
 // Default team color for path styling (when no logo color available)
 var DEFAULT_TEAM_COLOR = [66, 133, 244]; // blue
 
+function indexToLetter(index) {
+  var result = '';
+  index++;
+  while (index > 0) {
+    index--;
+    result = String.fromCharCode(65 + (index % 26)) + result;
+    index = Math.floor(index / 26);
+  }
+  return result;
+}
+
 var SIZE_CONFIG = {
   64: { startRound: 1, leafGids: [1, 64] },
   32: { startRound: 2, leafGids: [65, 96] },
@@ -97,8 +108,8 @@ function buildtree(teams, size) {
         var seed = order[s];
         var game = findgame(leafGames, gid);
         if (game) {
-          var raw = teams[reg] && teams[reg][seed];
-          game.team = normalizeTeam(raw || 'Team ' + gid);
+        var raw = teams[reg] && teams[reg][seed];
+        game.team = normalizeTeam(raw || 'Team ' + indexToLetter(gid - 1));
         }
         gid++;
       }
@@ -107,7 +118,7 @@ function buildtree(teams, size) {
     for (var i = 0; i < leafGames.length; i++) {
       var game = leafGames[i];
       var raw = teams && teams[game.gid];
-      game.team = normalizeTeam(raw || 'Team ' + (i + 1));
+      game.team = normalizeTeam(raw || 'Team ' + indexToLetter(i));
     }
   }
 
@@ -153,7 +164,7 @@ function makeTeamsForSize(size) {
   for (var i = 0; i < count; i++) {
     var gid = leafMin + i;
     var hue = bracketHueForLeaf(i, count);
-    teams[gid] = { name: 'Team ' + (i + 1), color: hslToRgb(hue, 65, 50) };
+    teams[gid] = { name: 'Team ' + indexToLetter(i), color: hslToRgb(hue, 65, 50) };
   }
   return teams;
 }
@@ -530,7 +541,7 @@ function loadTeams(data) {
     for (var s = 1; s <= 16; s++) {
       var key = String(s);
       var val = data[reg] && data[reg][key];
-      teams[reg][key] = (typeof val === 'object' && val.name) ? val : (val || 'Team ' + (r*16 + s));
+      teams[reg][key] = (typeof val === 'object' && val.name) ? val : (val || 'Team ' + indexToLetter(r * 16 + s - 1));
     }
   }
   return teams;
