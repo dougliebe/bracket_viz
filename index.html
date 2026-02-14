@@ -31,9 +31,9 @@
       padding: 20px;
     }
     path {
-      stroke-width: 0.15;
+      stroke-width: 0.75;
       fill: white;
-      stroke: #666;
+      stroke: #000000;
     }
     .arc { cursor: pointer; }
     .arc:hover path { fill: #f0f9ff !important; }
@@ -41,6 +41,14 @@
 </head>
 <body>
   <div class="controls">
+    <label for="sizeSelect">Bracket size:</label>
+    <select id="sizeSelect">
+      <option value="64">64 teams</option>
+      <option value="32">32 teams</option>
+      <option value="16">16 teams</option>
+      <option value="8">8 teams</option>
+      <option value="4">4 teams</option>
+    </select>
     <button id="resetBtn">Reset</button>
     <span>Click a team to advance them to the next round</span>
   </div>

@@ -12,6 +12,7 @@ An interactive radial NCAA tournament bracket. Click on teams to advance them th
 
 ## Features
 
+- **Bracket sizes:** Choose 8, 16, 32, or 64 teams. Smaller brackets show only the inner rings.
 - **Click to advance:** Click any team to advance them to the next round
 - **Re-selection:** Click the other team in a matchup to change the winner
 - **Path visualization:** Advancing teams show a colored path through the bracket

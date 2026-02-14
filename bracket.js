@@ -7,7 +7,21 @@
 // Default team color for path styling (when no logo color available)
 var DEFAULT_TEAM_COLOR = [66, 133, 244]; // blue
 
-function buildtree(teams) {
+var SIZE_CONFIG = {
+  64: { startRound: 1, leafGids: [1, 64] },
+  32: { startRound: 2, leafGids: [65, 96] },
+  16: { startRound: 3, leafGids: [97, 104] },
+  8: { startRound: 4, leafGids: [113, 120] },
+  4: { startRound: 5, leafGids: [121, 124] }
+};
+
+function buildtree(teams, size) {
+  size = size || 64;
+  var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+  var startRound = config.startRound;
+  var leafMin = config.leafGids[0];
+  var leafMax = config.leafGids[1];
+
   var round = 7;
   var gid = 127;
 
@@ -39,7 +53,7 @@ function buildtree(teams) {
     throw new Error("undefined region for gid " + gid);
   }
 
-  while (round > 0) {
+  while (round >= startRound) {
     roundgames[round] = [];
     for (var i=0; i < roundgames[round+1].length; i++) {
       var left = { gid: gid, region: region(gid), round: round, children: [] };
@@ -54,47 +68,95 @@ function buildtree(teams) {
     round--;
   }
 
-  var r_to_l = ['1', '16', '8', '9', '5', '12', '4', '13',
-                '6', '11', '3', '14', '7', '10', '2', '15'];
-  var l_to_r = ["15", "2", "10", "7", "14", "3", "11", "6",
-                "13", "4", "12", "5", "9", "8", "16", "1"];
-  var regions = ["south", "west", "midwest", "east"];
-
-  function findgame(gid) {
-    for (var i = 0; i < roundgames[1].length; i++) {
-      if (roundgames[1][i].gid === gid) return roundgames[1][i];
-    }
-    throw new Error("Unable to find gid " + gid);
-  }
-
-  // Normalize team: string -> { name: string }, object with name -> ensure { name, color? }
   function normalizeTeam(t) {
     if (typeof t === 'string') return { name: t };
     if (t && t.name) return t;
     return { name: 'Unknown' };
   }
 
-  var gid = 1;
-  for (var r = 0; r < regions.length; r++) {
-    var reg = regions[r];
-    var order = (reg === "south" || reg === "west") ? r_to_l : l_to_r;
-    for (var s = 0; s < order.length; s++) {
-      var seed = order[s];
-      var game = findgame(gid);
-      var raw = teams[reg] && teams[reg][seed];
-      game.team = normalizeTeam(raw || 'Team ' + gid);
-      gid++;
+  var leafGames = roundgames[startRound] || [];
+
+  function findgame(leafList, gid) {
+    for (var i = 0; i < leafList.length; i++) {
+      if (leafList[i].gid === gid) return leafList[i];
+    }
+    return null;
+  }
+
+  if (size === 64 && teams && teams.south) {
+    var r_to_l = ['1', '16', '8', '9', '5', '12', '4', '13',
+                  '6', '11', '3', '14', '7', '10', '2', '15'];
+    var l_to_r = ["15", "2", "10", "7", "14", "3", "11", "6",
+                  "13", "4", "12", "5", "9", "8", "16", "1"];
+    var regions = ["south", "west", "midwest", "east"];
+    var gid = 1;
+    for (var r = 0; r < regions.length; r++) {
+      var reg = regions[r];
+      var order = (reg === "south" || reg === "west") ? r_to_l : l_to_r;
+      for (var s = 0; s < order.length; s++) {
+        var seed = order[s];
+        var game = findgame(leafGames, gid);
+        if (game) {
+          var raw = teams[reg] && teams[reg][seed];
+          game.team = normalizeTeam(raw || 'Team ' + gid);
+        }
+        gid++;
+      }
+    }
+  } else {
+    for (var i = 0; i < leafGames.length; i++) {
+      var game = leafGames[i];
+      var raw = teams && teams[game.gid];
+      game.team = normalizeTeam(raw || 'Team ' + (i + 1));
     }
   }
 
   return root;
 }
 
-function main(teams) {
+function collectNodes(root) {
+  var nodes = [];
+  function visit(n) {
+    if (!n) return;
+    nodes.push(n);
+    (n.children || []).forEach(visit);
+  }
+  visit(root);
+  return nodes;
+}
+
+function randomTeamColor() {
+  var h = Math.floor(Math.random() * 360);
+  var s = 55 + Math.floor(Math.random() * 30);
+  var l = 45 + Math.floor(Math.random() * 25);
+  var c = (1 - Math.abs(2 * l / 100 - 1)) * s / 100;
+  var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  var m = l / 100 - c / 2;
+  var r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; b = 0; } else if (h < 120) { r = x; g = c; b = 0; } else if (h < 180) { r = 0; g = c; b = x; } else if (h < 240) { r = 0; g = x; b = c; } else if (h < 300) { r = x; g = 0; b = c; } else { r = c; g = 0; b = x; }
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+function makeTeamsForSize(size) {
+  var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+  var leafMin = config.leafGids[0];
+  var leafMax = config.leafGids[1];
+  var count = leafMax - leafMin + 1;
+  var teams = {};
+  for (var i = 0; i < count; i++) {
+    var gid = leafMin + i;
+    teams[gid] = { name: 'Team ' + (i + 1), color: randomTeamColor() };
+  }
+  return teams;
+}
+
+function main(teams, size) {
+  size = size || 64;
+  d3.select('#bracket').selectAll('*').remove();
   var radius = 400,
-      numRounds = 7,
-      root = buildtree(teams),
-      logoheight = 30;
+      logoheight = 30,
+      root = buildtree(teams, size),
+      allNodes = collectNodes(root);
 
   var partition = d3.layout.partition()
     .sort(null)
@@ -140,8 +202,9 @@ function main(teams) {
   };
 
   function findLeaf(game) {
-    if (!game || !game.team || game.round === 1) return game;
+    if (!game || !game.team) return game;
     var children = game.children || [];
+    if (children.length === 0) return game;
     for (var i = 0; i < children.length; i++) {
       if (children[i].team && children[i].team.name === game.team.name) {
         return findLeaf(children[i]);
@@ -182,9 +245,13 @@ function main(teams) {
   }
 
   function clearPaths() {
-    d3.selectAll(".arc path").style("fill", "#fff");
+    allNodes.forEach(function(n) {
+      var g = d3.select("#game" + n.gid);
+      if (!g.empty()) g.select("path").style("fill", "#fff");
+    });
     d3.selectAll("#teamname").remove();
-    d3.selectAll("#game127 .logo").style("opacity", "1");
+    var champ = d3.select("#game127");
+    if (!champ.empty()) champ.selectAll(".logo").style("opacity", "1");
   }
 
   function getTeamColor(team, callback) {
@@ -213,11 +280,9 @@ function main(teams) {
 
   function updateDisplay() {
     clearPaths();
-    var gamesWithTeam = [];
-    for (var i = 1; i < 128; i++) {
-      var game = d3.select("#game" + i).datum();
-      if (game && game.team && game.round > 1) gamesWithTeam.push(game);
-    }
+    var gamesWithTeam = allNodes.filter(function(n) {
+      return n.team && n.round > 1;
+    });
     gamesWithTeam.sort(function(a, b) { return b.round - a.round; });
     gamesWithTeam.forEach(function(game) {
       getTeamColor(game.team, function() {
@@ -229,11 +294,11 @@ function main(teams) {
   function getTeamsInSubtree(node) {
     var teams = {};
     if (!node) return teams;
-    if (node.round === 1 && node.team) {
+    var children = node.children || [];
+    if (children.length === 0 && node.team) {
       teams[node.team.name] = true;
       return teams;
     }
-    var children = node.children || [];
     for (var i = 0; i < children.length; i++) {
       var sub = getTeamsInSubtree(children[i]);
       for (var t in sub) teams[t] = true;
@@ -270,28 +335,32 @@ function main(teams) {
     updateLogos();
   }
 
+  function arcCenter(d) {
+    if (d.x == null || d.dx == null || d.y == null || d.dy == null) return [0, 0];
+    var midAngle = d.x + d.dx / 2;
+    var midRadius = d.y + d.dy / 2;
+    var x = midRadius * Math.sin(midAngle);
+    var y = -midRadius * Math.cos(midAngle);
+    var multipliers = { 4: 1.03, 5: 1.15, 6: 1.4, 7: 1.2 };
+    if (multipliers[d.round]) {
+      var m = multipliers[d.round];
+      x *= m; y *= m;
+    }
+    return [x, y];
+  }
+
   function updateLogos() {
-    var multipliers = { 4: 1.03, 5: 1.15, 6: 1.4 };
     function logoTransform(d) {
-      var pathNode = d3.select("#game"+d.gid+" path").node();
-      if (!pathNode) return trans(0,0);
-      var bb = pathNode.getBBox();
-      var x = bb.x + bb.width/2, y = bb.y + bb.height/2;
-      if (multipliers[d.round]) {
-        var m = multipliers[d.round];
-        x *= m; y *= m;
-      }
-      x -= logoheight/2; y -= logoheight/2;
-      return trans(x, y);
+      var c = arcCenter(d);
+      return trans(c[0] - logoheight/2, c[1] - logoheight/2);
     }
 
-    for (var i = 1; i < 128; i++) {
-      var game = d3.select("#game" + i).datum();
-      var logoG = d3.select("#game" + i).select(".logo");
-      if (logoG.empty()) continue;
+    allNodes.forEach(function(game) {
+      var logoG = d3.select("#game" + game.gid).select(".logo");
+      if (logoG.empty()) return;
       logoG.selectAll("*").remove();
 
-      if (game && game.team) {
+      if (game.team) {
         var gid = game.gid;
         var teamName = game.team.name;
         var img = logoG.append("image")
@@ -302,20 +371,18 @@ function main(teams) {
           .on("error", function() {
             var g = d3.select(this.parentNode);
             d3.select(this).remove();
-            var pathNode = d3.select("#game"+gid+" path").node();
-            if (pathNode) {
-              var bb = pathNode.getBBox();
-              g.append("text")
-                .attr("text-anchor", "middle")
-                .attr("x", bb.x + bb.width/2)
-                .attr("y", bb.y + bb.height/2)
-                .style("font-size", "9px")
-                .style("fill", "#333")
-                .text(teamName);
-            }
+            var c = arcCenter(game);
+            g.append("text")
+              .attr("text-anchor", "middle")
+              .attr("dominant-baseline", "central")
+              .attr("x", c[0])
+              .attr("y", c[1])
+              .style("font-size", "9px")
+              .style("fill", "#333")
+              .text(teamName);
           });
       }
-    }
+    });
   }
 
   arcs.on('click', function(d) {
@@ -343,15 +410,9 @@ function main(teams) {
     .attr("clip-path", function(d) { return "url(#text-clip-game"+d.gid+")"; })
     .attr("id", function(d) { return "logo" + d.gid; });
 
-  var multipliers = { 4: 1.03, 5: 1.15, 6: 1.4 };
-  function logoTransform(d) {
-    var pathNode = d3.select("#game"+d.gid+" path").node();
-    if (!pathNode) return trans(0,0);
-    var bb = pathNode.getBBox();
-    var x = bb.x + bb.width/2, y = bb.y + bb.height/2;
-    if (multipliers[d.round]) { var m = multipliers[d.round]; x *= m; y *= m; }
-    x -= logoheight/2; y -= logoheight/2;
-    return trans(x, y);
+  function logoTransformInit(d) {
+    var c = arcCenter(d);
+    return trans(c[0] - logoheight/2, c[1] - logoheight/2);
   }
 
   logos.filter(function(d) { return d.team; })
@@ -359,22 +420,20 @@ function main(teams) {
       var g = d3.select(this);
       var img = g.append("image")
         .attr("xlink:href", "logos/"+d.team.name+".png")
-        .attr("transform", logoTransform(d))
+        .attr("transform", logoTransformInit(d))
         .attr("width", logoheight)
         .attr("height", logoheight);
       img.on("error", function() {
         d3.select(this).remove();
-        var pathNode = d3.select("#game"+d.gid+" path").node();
-        if (pathNode) {
-          var bb = pathNode.getBBox();
-          g.append("text")
-            .attr("text-anchor", "middle")
-            .attr("x", bb.x + bb.width/2)
-            .attr("y", bb.y + bb.height/2)
-            .style("font-size", "9px")
-            .style("fill", "#333")
-            .text(d.team.name);
-        }
+        var c = arcCenter(d);
+        g.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "central")
+          .attr("x", c[0])
+          .attr("y", c[1])
+          .style("font-size", "9px")
+          .style("fill", "#333")
+          .text(d.team.name);
       });
     });
 
@@ -438,18 +497,39 @@ function loadTeams(data) {
   return teams;
 }
 
+var fullTeams = null;
+
+function getTeamsForSize(size) {
+  if (size === 64) return fullTeams || loadTeams({});
+  return makeTeamsForSize(size);
+}
+
+function initBracket(size) {
+  size = size || parseInt(document.getElementById('sizeSelect').value, 10) || 64;
+  var teams = getTeamsForSize(size);
+  main(teams, size);
+}
+
 queue()
   .defer(d3.json, 'bracket.json')
   .await(function(err, data) {
-    var teams;
     if (err || !data) {
       d3.json('teams.json', function(e2, t) {
-        teams = t || loadTeams({});
-        main(teams);
+        fullTeams = t || loadTeams({});
+        initBracket(64);
       });
     } else {
-      teams = (data.south && typeof data.south["1"] === 'object' && data.south["1"].name)
+      fullTeams = (data.south && typeof data.south["1"] === 'object' && data.south["1"].name)
         ? data : loadTeams(data);
-      main(teams);
+      initBracket(64);
     }
   });
+
+(function setupSizeSelector() {
+  var sizeSelect = document.getElementById('sizeSelect');
+  if (sizeSelect) {
+    sizeSelect.addEventListener('change', function() {
+      initBracket(parseInt(this.value, 10));
+    });
+  }
+})();
