@@ -10,6 +10,7 @@
       background: #fff;
       border-bottom: 1px solid #ddd;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 16px;
     }
@@ -49,6 +50,13 @@
       <option value="8">8 teams</option>
       <option value="4">4 teams</option>
     </select>
+    <label>Teams:</label>
+    <label><input type="radio" name="teamMode" value="random" checked> Random</label>
+    <label><input type="radio" name="teamMode" value="custom"> Custom</label>
+    <div id="customTeamsWrap" style="display: none;">
+      <textarea id="customTeamsInput" placeholder="Team A, Team B, Team C, ... (4, 8, 16, 32, or 64 teams)" rows="2" style="width: 300px; vertical-align: middle;"></textarea>
+      <span id="customTeamsError" style="color: #dc2626; font-size: 12px; margin-left: 8px;"></span>
+    </div>
     <button id="resetBtn">Reset</button>
     <button id="randomBtn">Random</button>
     <span>Click a team to advance them to the next round</span>

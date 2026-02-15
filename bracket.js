@@ -109,7 +109,7 @@ function buildtree(teams, size) {
         var game = findgame(leafGames, gid);
         if (game) {
         var raw = teams[reg] && teams[reg][seed];
-        game.team = normalizeTeam(raw || 'Team ' + indexToLetter(gid - 1));
+        game.team = normalizeTeam(raw || indexToLetter(gid - 1));
         }
         gid++;
       }
@@ -118,7 +118,7 @@ function buildtree(teams, size) {
     for (var i = 0; i < leafGames.length; i++) {
       var game = leafGames[i];
       var raw = teams && teams[game.gid];
-      game.team = normalizeTeam(raw || 'Team ' + indexToLetter(i));
+      game.team = normalizeTeam(raw || indexToLetter(i));
     }
   }
 
@@ -164,7 +164,30 @@ function makeTeamsForSize(size) {
   for (var i = 0; i < count; i++) {
     var gid = leafMin + i;
     var hue = bracketHueForLeaf(i, count);
-    teams[gid] = { name: 'Team ' + indexToLetter(i), color: hslToRgb(hue, 65, 50) };
+    teams[gid] = { name: indexToLetter(i), color: hslToRgb(hue, 65, 50) };
+  }
+  return teams;
+}
+
+function parseCustomTeams(input) {
+  if (!input || typeof input !== 'string') return null;
+  var names = input.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var validLengths = [4, 8, 16, 32, 64];
+  if (validLengths.indexOf(names.length) === -1) return null;
+  return names;
+}
+
+function teamsFromCustomInput(names, size) {
+  var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+  var leafMin = config.leafGids[0];
+  var leafMax = config.leafGids[1];
+  var count = leafMax - leafMin + 1;
+  if (!names || names.length !== count) return null;
+  var teams = {};
+  for (var i = 0; i < count; i++) {
+    var gid = leafMax - i;
+    var hue = bracketHueForLeaf(i, count);
+    teams[gid] = { name: names[i], color: hslToRgb(hue, 65, 50) };
   }
   return teams;
 }
@@ -424,7 +447,7 @@ function main(teams, size) {
               .attr("dominant-baseline", "central")
               .attr("x", c[0])
               .attr("y", c[1])
-              .style("font-size", "16px")
+              .style("font-size", "28px")
               .style("font-weight", "bold")
               .style("fill", "#333")
               .text(teamName);
@@ -479,7 +502,7 @@ function main(teams, size) {
           .attr("dominant-baseline", "central")
           .attr("x", c[0])
           .attr("y", c[1])
-          .style("font-size", "16px")
+          .style("font-size", "28px")
           .style("font-weight", "bold")
           .style("fill", "#333")
           .text(d.team.name);
@@ -560,23 +583,59 @@ function loadTeams(data) {
     for (var s = 1; s <= 16; s++) {
       var key = String(s);
       var val = data[reg] && data[reg][key];
-      teams[reg][key] = (typeof val === 'object' && val.name) ? val : (val || 'Team ' + indexToLetter(r * 16 + s - 1));
+      teams[reg][key] = (typeof val === 'object' && val.name) ? val : (val || indexToLetter(r * 16 + s - 1));
     }
   }
   return teams;
 }
 
 var fullTeams = null;
+var teamMode = 'random';
+var customTeamsInput = '';
 
 function getTeamsForSize(size) {
+  if (teamMode === 'custom') {
+    var parsed = parseCustomTeams(customTeamsInput);
+    if (parsed) {
+      var customTeams = teamsFromCustomInput(parsed, size);
+      if (customTeams) return customTeams;
+    }
+  }
   if (size === 64) return fullTeams || loadTeams({});
   return makeTeamsForSize(size);
+}
+
+function updateCustomTeamsValidation() {
+  var errEl = document.getElementById('customTeamsError');
+  if (!errEl) return;
+  if (teamMode !== 'custom') {
+    errEl.textContent = '';
+    return;
+  }
+  var size = parseInt(document.getElementById('sizeSelect').value, 10) || 64;
+  var parsed = parseCustomTeams(customTeamsInput);
+  if (!customTeamsInput.trim()) {
+    errEl.textContent = '';
+    return;
+  }
+  if (!parsed) {
+    errEl.textContent = 'Enter 4, 8, 16, 32, or 64 teams';
+    return;
+  }
+  var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+  var count = config.leafGids[1] - config.leafGids[0] + 1;
+  if (parsed.length !== count) {
+    errEl.textContent = 'Need ' + count + ' teams for ' + size + '-team bracket';
+    return;
+  }
+  errEl.textContent = '';
 }
 
 function initBracket(size) {
   size = size || parseInt(document.getElementById('sizeSelect').value, 10) || 64;
   var teams = getTeamsForSize(size);
   main(teams, size);
+  updateCustomTeamsValidation();
 }
 
 queue()
@@ -599,6 +658,48 @@ queue()
   if (sizeSelect) {
     sizeSelect.addEventListener('change', function() {
       initBracket(parseInt(this.value, 10));
+    });
+  }
+})();
+
+(function setupTeamModeAndCustomInput() {
+  var modeRadios = document.querySelectorAll('input[name="teamMode"]');
+  var customWrap = document.getElementById('customTeamsWrap');
+  var customInput = document.getElementById('customTeamsInput');
+
+  function applyMode() {
+    var checked = document.querySelector('input[name="teamMode"]:checked');
+    teamMode = checked ? checked.value : 'random';
+    if (customWrap) customWrap.style.display = teamMode === 'custom' ? '' : 'none';
+    if (teamMode === 'custom' && customInput) customTeamsInput = customInput.value;
+    updateCustomTeamsValidation();
+    initBracket();
+  }
+
+  if (modeRadios.length) {
+    modeRadios.forEach(function(r) {
+      r.addEventListener('change', applyMode);
+    });
+  }
+
+  if (customInput) {
+    customInput.addEventListener('input', function() {
+      customTeamsInput = this.value;
+      if (teamMode === 'custom') {
+        updateCustomTeamsValidation();
+        var parsed = parseCustomTeams(customTeamsInput);
+        var size = parseInt(document.getElementById('sizeSelect').value, 10) || 64;
+        var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+        var count = config.leafGids[1] - config.leafGids[0] + 1;
+        if (parsed && parsed.length === count) initBracket();
+      }
+    });
+    customInput.addEventListener('blur', function() {
+      customTeamsInput = this.value;
+      if (teamMode === 'custom') {
+        updateCustomTeamsValidation();
+        initBracket();
+      }
     });
   }
 })();
