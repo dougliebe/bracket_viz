@@ -21,3 +21,18 @@ An interactive radial NCAA tournament bracket. Click on teams to advance them th
 ## Data
 
 Uses `bracket.json` for team names (simple format: `{ region: { seed: "TeamName" } }`). Falls back to `teams.json` if needed. All matchups are treated as 50/50—no odds or probabilities.
+
+### Team logos
+
+To download team logo PNGs into the `logos/` folder:
+
+```bash
+# From bracket.json
+py download_logos.py --bracket
+
+# From command line (quote multi-word names)
+py download_logos.py Kansas Gonzaga "North Carolina"
+
+# From a file (one team per line)
+py download_logos.py -f teams.txt
+```
