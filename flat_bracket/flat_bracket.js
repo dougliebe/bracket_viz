@@ -8,6 +8,13 @@ var LOGO_SIZE = 20;   /* 1.5x smaller: 30 / 1.5 */
 var CELL_WIDTH = 94;  /* 1.5x smaller: 140 / 1.5 */
 var CELL_HEIGHT = 24; /* 1.5x smaller: 36 / 1.5 */
 
+function eloWinProb(eloA, eloB) {
+  if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return null;
+  if (eloB === 0) return 1;
+  if (eloA === 0) return 0;
+  return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
+}
+
 function indexToLetter(index) {
   var result = '';
   index++;
@@ -309,7 +316,27 @@ function loadTeams(data) {
   return teams;
 }
 
-function render(root, allNodes, container, width, height) {
+function isFrontierMatchup(node, size) {
+  var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+  if (!node || !node.children || node.children.length !== 2) return false;
+  if (node.round <= config.startRound) return false;
+  if (node.team) return false;
+  return node.children[0].team && node.children[1].team;
+}
+
+function buildTeamNameToElo(allNodes) {
+  var map = {};
+  allNodes.forEach(function(n) {
+    if (n.team && n.team.name && n.team.elo != null && Number.isFinite(n.team.elo)) {
+      map[n.team.name] = n.team.elo;
+    }
+  });
+  return map;
+}
+
+function render(root, allNodes, container, width, height, grayedTeams, size) {
+  grayedTeams = grayedTeams || new Set();
+  size = size || 64;
   d3.select(container).selectAll('*').remove();
 
   var svg = d3.select(container)
@@ -321,9 +348,29 @@ function render(root, allNodes, container, width, height) {
   var cellsGroup = svg.append('g').attr('class', 'cells');
   var labelsGroup = svg.append('g').attr('class', 'labels');
 
+  function updateGrayState() {
+    cellsGroup.selectAll('g.team-cell').each(function() {
+      var g = d3.select(this);
+      var gid = parseInt(g.attr('id').replace('game', ''), 10);
+      var node = allNodes.filter(function(n) { return n.gid === gid; })[0];
+      if (!node) return;
+      if (node.team) {
+        var isGrayed = grayedTeams.has(node.team.name);
+        g.select('rect').attr('fill', isGrayed ? '#b4b4b4' : '#fff');
+      } else if (isFrontierMatchup(node, size)) {
+        g.selectAll('g.frontier-logo').each(function() {
+          var teamName = d3.select(this).attr('data-team');
+          var isGrayed = grayedTeams.has(teamName);
+          d3.select(this)
+            .style('opacity', isGrayed ? '0.4' : '1')
+            .style('filter', isGrayed ? 'grayscale(100%)' : 'none');
+        });
+      }
+    });
+  }
+
   function update() {
     linesGroup.selectAll('*').remove();
-    cellsGroup.selectAll('*').remove();
 
     allNodes.forEach(function(node) {
       var children = node.children || [];
@@ -351,69 +398,193 @@ function render(root, allNodes, container, width, height) {
         .attr('stroke', '#333').attr('stroke-width', 1);
     });
 
-    allNodes.forEach(function(node) {
-      if (node.px == null || node.py == null) return;
+    var cellNodes = allNodes.filter(function(node) {
+      return node.px != null && node.py != null &&
+        (node.team || node.round === 1 || isFrontierMatchup(node, size));
+    });
+    var cells = cellsGroup.selectAll('g.team-cell').data(cellNodes, function(d) { return d.gid; });
 
+    var teamNameToElo = buildTeamNameToElo(allNodes);
+    var hasElo = Object.keys(teamNameToElo).length > 0;
+
+    function addCellContent(g, node) {
       var team = node.team;
-      var seed = node.round === 1 ? getSeedForGid(node.gid) : '';
       var isRound1 = node.round === 1;
-      var label = team ? (seed ? seed + ' ' + team.name : team.name) : (seed ? seed + ' TBD' : '');
-      if (!team && node.round > 1) return;
+      var isFrontier = hasElo && isFrontierMatchup(node, size);
 
-      var g = cellsGroup.append('g')
-        .attr('class', 'team-cell')
-        .attr('id', 'game' + node.gid)
-        .attr('transform', 'translate(' + (node.px - CELL_WIDTH / 2) + ',' + (node.py - CELL_HEIGHT / 2) + ')')
-        .style('cursor', team && node.parent ? 'pointer' : 'default');
-
-      var rect = g.append('rect')
-        .attr('width', CELL_WIDTH)
-        .attr('height', CELL_HEIGHT)
-        .attr('rx', 3)
-        .attr('ry', 3)
-        .attr('fill', '#fff')
-        .attr('stroke', '#333')
-        .attr('stroke-width', 1);
-
-      if (team) {
-        var img = g.append('image')
-          .attr('xlink:href', LOGO_PATH + team.name + '.png')
-          .attr('width', LOGO_SIZE)
-          .attr('height', LOGO_SIZE)
-          .on('error', function() {
-            d3.select(this).remove();
-            if (!isRound1) {
-              g.append('text')
-                .attr('x', CELL_WIDTH / 2)
-                .attr('y', CELL_HEIGHT / 2)
-                .attr('text-anchor', 'middle')
-                .attr('dominant-baseline', 'middle')
-                .style('font-size', '9px')
-                .style('fill', '#333')
-                .text(team.name);
-            }
-          });
-        if (isRound1) {
-          img.attr('x', 2).attr('y', 2);
-        } else {
-          img.attr('x', (CELL_WIDTH - LOGO_SIZE) / 2).attr('y', (CELL_HEIGHT - LOGO_SIZE) / 2);
+      if (isFrontier) {
+        var c0 = node.children[0].team;
+        var c1 = node.children[1].team;
+        var elo0 = teamNameToElo[c0.name];
+        var elo1 = teamNameToElo[c1.name];
+        var p0 = (elo0 != null && elo1 != null) ? eloWinProb(elo0, elo1) : null;
+        var p1 = (elo0 != null && elo1 != null) ? eloWinProb(elo1, elo0) : null;
+        var smallLogo = 12;
+        var pad = 6;
+        [0, 1].forEach(function(slot) {
+          var t = slot === 0 ? c0 : c1;
+          var x = slot === 0 ? pad : CELL_WIDTH - pad - smallLogo;
+          var imgWrap = g.append('g')
+            .attr('class', 'frontier-logo')
+            .attr('data-team', t.name)
+            .attr('transform', 'translate(' + x + ', 2)');
+          imgWrap.style('opacity', grayedTeams.has(t.name) ? '0.4' : '1');
+          imgWrap.style('filter', grayedTeams.has(t.name) ? 'grayscale(100%)' : 'none');
+          var img = imgWrap.append('image')
+            .attr('xlink:href', LOGO_PATH + t.name + '.png')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('width', smallLogo)
+            .attr('height', smallLogo)
+            .on('error', function() {
+              d3.select(this).remove();
+            });
+        });
+        if (p0 != null && p1 != null) {
+          g.append('text')
+            .attr('class', 'win-prob')
+            .attr('x', CELL_WIDTH / 2)
+            .attr('y', CELL_HEIGHT / 2)
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'middle')
+            .style('font-size', '11px')
+            .style('fill', '#333')
+            .text(Math.round(p0 * 100) + '% – ' + Math.round(p1 * 100) + '%');
         }
+        return;
       }
 
+      if (!team) return;
+      var img = g.append('image')
+        .attr('xlink:href', LOGO_PATH + team.name + '.png')
+        .attr('width', LOGO_SIZE)
+        .attr('height', LOGO_SIZE)
+        .on('error', function() {
+          d3.select(this).remove();
+          if (!isRound1) {
+            g.append('text')
+              .attr('class', 'logo-fallback')
+              .attr('x', CELL_WIDTH / 2)
+              .attr('y', CELL_HEIGHT / 2)
+              .attr('text-anchor', 'middle')
+              .attr('dominant-baseline', 'middle')
+              .style('font-size', '9px')
+              .style('fill', '#333')
+              .text(team.name);
+          }
+        });
       if (isRound1) {
+        img.attr('x', 2).attr('y', 2);
+      } else {
+        img.attr('x', (CELL_WIDTH - LOGO_SIZE) / 2).attr('y', (CELL_HEIGHT - LOGO_SIZE) / 2);
+      }
+    }
+
+    var cellEnter = cells.enter().append('g')
+      .attr('class', 'team-cell')
+      .attr('id', function(d) { return 'game' + d.gid; })
+      .attr('transform', function(d) { return 'translate(' + (d.px - CELL_WIDTH / 2) + ',' + (d.py - CELL_HEIGHT / 2) + ')'; })
+      .style('cursor', function(d) { return d.team ? 'pointer' : 'default'; });
+
+    cellEnter.append('rect')
+      .attr('width', CELL_WIDTH)
+      .attr('height', CELL_HEIGHT)
+      .attr('rx', 3)
+      .attr('ry', 3)
+      .attr('fill', function(d) { return (d.team && grayedTeams.has(d.team.name)) ? '#b4b4b4' : '#fff'; })
+      .attr('stroke', '#333')
+      .attr('stroke-width', 1);
+
+    cellEnter.each(function(node) {
+      var g = d3.select(this);
+      addCellContent(g, node);
+      var seed = node.round === 1 ? getSeedForGid(node.gid) : '';
+      var isFrontier = isFrontierMatchup(node, size);
+      var label = !isFrontier && node.team ? (seed ? seed + ' ' + node.team.name : node.team.name) : (seed ? seed + ' TBD' : '');
+      if (node.round === 1) {
         g.append('text')
-          .attr('x', team ? 28 : 6)
+          .attr('class', 'seed-label')
+          .attr('x', node.team ? 28 : 6)
           .attr('y', CELL_HEIGHT / 2)
           .attr('dy', '0.35em')
           .style('font-size', '10px')
           .style('fill', '#333')
           .text(label);
       }
-
-      if (team && node.parent) {
+      if (node.team) {
         g.on('click', function() {
-          advanceTeam(node, update);
+          if (d3.event.ctrlKey || d3.event.metaKey) {
+            if (grayedTeams.has(node.team.name)) {
+              grayedTeams.delete(node.team.name);
+            } else {
+              grayedTeams.add(node.team.name);
+            }
+            updateGrayState();
+          } else if (node.parent) {
+            advanceTeam(node, update);
+          }
         });
+      }
+    });
+
+    cells.exit().remove();
+
+    cells
+      .attr('transform', function(d) { return 'translate(' + (d.px - CELL_WIDTH / 2) + ',' + (d.py - CELL_HEIGHT / 2) + ')'; })
+      .style('cursor', function(d) { return d.team ? 'pointer' : 'default'; });
+
+    cells.select('rect').attr('fill', function(d) {
+      return (d.team && grayedTeams.has(d.team.name)) ? '#b4b4b4' : '#fff';
+    });
+
+    cells.each(function(node) {
+      var g = d3.select(this);
+      g.on('click', null);
+      if (node.team) {
+        g.on('click', function() {
+          if (d3.event.ctrlKey || d3.event.metaKey) {
+            if (grayedTeams.has(node.team.name)) {
+              grayedTeams.delete(node.team.name);
+            } else {
+              grayedTeams.add(node.team.name);
+            }
+            updateGrayState();
+          } else if (node.parent) {
+            advanceTeam(node, update);
+          }
+        });
+      }
+    });
+
+    cells.each(function(node) {
+      var g = d3.select(this);
+      var isFrontier = isFrontierMatchup(node, size);
+      var cacheKey = isFrontier && node.children && node.children.length === 2
+        ? 'frontier:' + (node.children[0].team ? node.children[0].team.name : '') + ':' + (node.children[1].team ? node.children[1].team.name : '')
+        : (node.team ? node.team.name : null);
+      if (node._lastCellTeam !== cacheKey) {
+        node._lastCellTeam = cacheKey;
+        g.selectAll('image, text.logo-fallback, text.win-prob, g.frontier-logo').remove();
+        if (node.team || isFrontier) {
+          addCellContent(g, node);
+        }
+        if (node.round === 1) {
+          var seed = getSeedForGid(node.gid);
+          var label = !isFrontier && node.team ? (seed ? seed + ' ' + node.team.name : node.team.name) : (seed ? seed + ' TBD' : '');
+          var labelEl = g.select('text.seed-label');
+          if (labelEl.empty()) {
+            g.append('text')
+              .attr('class', 'seed-label')
+              .attr('x', node.team ? 28 : 6)
+              .attr('y', CELL_HEIGHT / 2)
+              .attr('dy', '0.35em')
+              .style('font-size', '10px')
+              .style('fill', '#333')
+              .text(label);
+          } else {
+            labelEl.attr('x', node.team ? 28 : 6).text(label);
+          }
+        }
       }
     });
 
@@ -457,18 +628,19 @@ function main(teams, size) {
   var dims = getBracketDimensions();
   var width = dims.width;
   var height = dims.height;
+  var grayedTeams = new Set();
 
   var root = buildtree(teams, size);
   setParents(root, null);
   var allNodes = collectNodes(root);
   computePositions(root, width, height);
 
-  var currentUpdate = render(root, allNodes, '#bracket', width, height);
+  var currentUpdate = render(root, allNodes, '#bracket', width, height, grayedTeams, size);
 
   window.addEventListener('resize', function onResize() {
     var d = getBracketDimensions();
     computePositions(root, d.width, d.height);
-    currentUpdate = render(root, allNodes, '#bracket', d.width, d.height);
+    currentUpdate = render(root, allNodes, '#bracket', d.width, d.height, grayedTeams, size);
   });
 
   window.bracketRandom = function() {
@@ -485,6 +657,7 @@ function main(teams, size) {
   };
 
   window.bracketReset = function() {
+    grayedTeams.clear();
     function clearWinners(node) {
       var hasChildren = node.children && node.children.length > 0;
       if (hasChildren) node.team = undefined;

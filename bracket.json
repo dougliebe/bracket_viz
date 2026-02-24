@@ -1,74 +1,266 @@
 {
   "south": {
-    "1": "Auburn",
-    "16": "Alabama St",
-    "8": "Louisville",
-    "9": "Creighton",
-    "5": "Michigan",
-    "12": "UC San Diego",
-    "4": "Texas A&M",
-    "13": "Yale",
-    "6": "Mississippi",
-    "11": "North Carolina",
-    "3": "Iowa St",
-    "14": "Lipscomb",
-    "7": "Marquette",
-    "10": "New Mexico",
-    "2": "Michigan St",
-    "15": "Bryant"
+    "1": {
+      "name": "Auburn",
+      "elo": 2069.02
+    },
+    "16": {
+      "name": "Alabama St",
+      "elo": 1346.38
+    },
+    "8": {
+      "name": "Louisville",
+      "elo": 1948.82
+    },
+    "9": {
+      "name": "Creighton",
+      "elo": 1898.64
+    },
+    "5": {
+      "name": "Michigan",
+      "elo": 1898.56
+    },
+    "12": {
+      "name": "UC San Diego",
+      "elo": 1861.73
+    },
+    "4": {
+      "name": "Texas A&M",
+      "elo": 1945.56
+    },
+    "13": {
+      "name": "Yale",
+      "elo": 1772.81
+    },
+    "6": {
+      "name": "Mississippi",
+      "elo": 1840.14
+    },
+    "11": {
+      "name": "North Carolina",
+      "elo": 1849.12
+    },
+    "3": {
+      "name": "Iowa St",
+      "elo": 1924.77
+    },
+    "14": {
+      "name": "Lipscomb",
+      "elo": 1640.51
+    },
+    "7": {
+      "name": "Marquette",
+      "elo": 1885.53
+    },
+    "10": {
+      "name": "New Mexico",
+      "elo": 1869.79
+    },
+    "2": {
+      "name": "Michigan St",
+      "elo": 2035.9
+    },
+    "15": {
+      "name": "Bryant",
+      "elo": 1612.34
+    }
   },
   "west": {
-    "1": "Florida",
-    "16": "Norfolk St",
-    "8": "Connecticut",
-    "9": "Oklahoma",
-    "5": "Memphis",
-    "12": "Colorado St",
-    "4": "Maryland",
-    "13": "Grand Canyon",
-    "6": "Missouri",
-    "11": "Drake",
-    "3": "Texas Tech",
-    "14": "UNC Wilmington",
-    "7": "Kansas",
-    "10": "Arkansas",
-    "2": "St John's",
-    "15": "NE Omaha"
+    "1": {
+      "name": "Florida",
+      "elo": 2128.93
+    },
+    "16": {
+      "name": "Norfolk St",
+      "elo": 1514.06
+    },
+    "8": {
+      "name": "Connecticut",
+      "elo": 1934.4
+    },
+    "9": {
+      "name": "Oklahoma",
+      "elo": 1802.37
+    },
+    "5": {
+      "name": "Memphis",
+      "elo": 1871.5
+    },
+    "12": {
+      "name": "Colorado St",
+      "elo": 1855.62
+    },
+    "4": {
+      "name": "Maryland",
+      "elo": 1989.71
+    },
+    "13": {
+      "name": "Grand Canyon",
+      "elo": 1723.73
+    },
+    "6": {
+      "name": "Missouri",
+      "elo": 1904.58
+    },
+    "11": {
+      "name": "Drake",
+      "elo": 1869.47
+    },
+    "3": {
+      "name": "Texas Tech",
+      "elo": 1971.06
+    },
+    "14": {
+      "name": "UNC Wilmington",
+      "elo": 1653.7
+    },
+    "7": {
+      "name": "Kansas",
+      "elo": 1966.78
+    },
+    "10": {
+      "name": "Arkansas",
+      "elo": 1791.31
+    },
+    "2": {
+      "name": "St John's",
+      "elo": 2057.69
+    },
+    "15": {
+      "name": "NE Omaha",
+      "elo": 1579.04
+    }
   },
   "midwest": {
-    "1": "Houston",
-    "16": "SIUE",
-    "8": "Gonzaga",
-    "9": "Georgia",
-    "5": "Clemson",
-    "12": "McNeese St",
-    "4": "Purdue",
-    "13": "High Point",
-    "6": "Illinois",
-    "11": "Xavier",
-    "3": "Kentucky",
-    "14": "Troy",
-    "7": "UCLA",
-    "10": "Utah St",
-    "2": "Tennessee",
-    "15": "Wofford"
+    "1": {
+      "name": "Houston",
+      "elo": 2123.22
+    },
+    "16": {
+      "name": "SIUE",
+      "elo": 1458.34
+    },
+    "8": {
+      "name": "Gonzaga",
+      "elo": 1955.0
+    },
+    "9": {
+      "name": "Georgia",
+      "elo": 1843.96
+    },
+    "5": {
+      "name": "Clemson",
+      "elo": 1957.48
+    },
+    "12": {
+      "name": "McNeese St",
+      "elo": 1682.99
+    },
+    "4": {
+      "name": "Purdue",
+      "elo": 1852.41
+    },
+    "13": {
+      "name": "High Point",
+      "elo": 1717.53
+    },
+    "6": {
+      "name": "Illinois",
+      "elo": 1885.37
+    },
+    "11": {
+      "name": "Xavier",
+      "elo": 1831.92
+    },
+    "3": {
+      "name": "Kentucky",
+      "elo": 1848.65
+    },
+    "14": {
+      "name": "Troy",
+      "elo": 1651.78
+    },
+    "7": {
+      "name": "UCLA",
+      "elo": 1846.37
+    },
+    "10": {
+      "name": "Utah St",
+      "elo": 1890.38
+    },
+    "2": {
+      "name": "Tennessee",
+      "elo": 2014.04
+    },
+    "15": {
+      "name": "Wofford",
+      "elo": 1603.47
+    }
   },
   "east": {
-    "1": "Duke",
-    "16": "Mt St Mary's",
-    "8": "Mississippi St",
-    "9": "Baylor",
-    "5": "Oregon",
-    "12": "Liberty",
-    "4": "Arizona",
-    "13": "Akron",
-    "6": "BYU",
-    "11": "VCU",
-    "3": "Wisconsin",
-    "14": "Montana",
-    "7": "St Mary's CA",
-    "10": "Vanderbilt",
-    "2": "Alabama",
-    "15": "Robert Morris"
+    "1": {
+      "name": "Duke",
+      "elo": 2105.55
+    },
+    "16": {
+      "name": "Mt St Mary's",
+      "elo": 1475.66
+    },
+    "8": {
+      "name": "Mississippi St",
+      "elo": 1798.52
+    },
+    "9": {
+      "name": "Baylor",
+      "elo": 1853.6
+    },
+    "5": {
+      "name": "Oregon",
+      "elo": 1866.24
+    },
+    "12": {
+      "name": "Liberty",
+      "elo": 1784.57
+    },
+    "4": {
+      "name": "Arizona",
+      "elo": 1954.37
+    },
+    "13": {
+      "name": "Akron",
+      "elo": 1642.84
+    },
+    "6": {
+      "name": "BYU",
+      "elo": 1914.76
+    },
+    "11": {
+      "name": "VCU",
+      "elo": 1888.8
+    },
+    "3": {
+      "name": "Wisconsin",
+      "elo": 2009.37
+    },
+    "14": {
+      "name": "Montana",
+      "elo": 1583.39
+    },
+    "7": {
+      "name": "St Mary's CA",
+      "elo": 1924.97
+    },
+    "10": {
+      "name": "Vanderbilt",
+      "elo": 1704.57
+    },
+    "2": {
+      "name": "Alabama",
+      "elo": 2001.72
+    },
+    "15": {
+      "name": "Robert Morris",
+      "elo": 1611.8
+    }
   }
 }

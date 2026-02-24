@@ -52,26 +52,48 @@ def main():
         key = r["TeamNameSpelling"].strip().lower()
         spelling_to_team_id[key] = tid
 
-    # Load elo data with row ID (1-based)
+    # Load elo data with row ID (1-based) and elo values
     elo_rows = load_csv(ELO_CSV)
-    # First column may be unnamed; pandas/R names it X1 or similar
+    if not elo_rows:
+        raise SystemExit("Elo CSV is empty: " + str(ELO_CSV))
+    current_elo_key = next((k for k in elo_rows[0].keys() if "current" in k.lower() and "elo" in k.lower()), "Current Elo")
+    season_max_key = next((k for k in elo_rows[0].keys() if "season" in k.lower() and "max" in k.lower()), "Season Max.")
+
+    def parse_elo(val):
+        if val is None or val == "":
+            return 0.0
+        s = str(val).strip()
+        # Strip trailing non-numeric (e.g. "62.00392" from "62.00392,43.21768")
+        for i, c in enumerate(s):
+            if c and not (c.isdigit() or c == "." or c == "-"):
+                s = s[:i]
+                break
+        try:
+            return float(s) if s else 0.0
+        except ValueError:
+            return 0.0
+
     elo_by_team = {}
     for i, r in enumerate(elo_rows):
         row_id = i + 1  # 1-based
         team_raw = r.get("Team", r.get("team", ""))
         if not team_raw:
-            # Try first column as fallback
             cols = list(r.keys())
             if cols and cols[0] and cols[0] != "Team":
                 continue
         team_lower = team_raw.strip().lower()
-        elo_by_team[team_lower] = {"row_id": row_id, "team_raw": team_raw}
+        current = parse_elo(r.get(current_elo_key, r.get("Current Elo", 0)))
+        season_max = parse_elo(r.get(season_max_key, r.get("Season Max.", 0)))
+        elo_val = current if current > 0 else season_max
+        elo_by_team[team_lower] = {"row_id": row_id, "team_raw": team_raw, "elo": elo_val}
 
-    # Build TeamID -> elo row_id
+    # Build TeamID -> elo row_id (for play-in filter) and TeamID -> elo value
     team_id_to_elo_id = {}
+    team_id_to_elo = {}
     for spelling, tid in spelling_to_team_id.items():
         if spelling in elo_by_team:
             team_id_to_elo_id[tid] = elo_by_team[spelling]["row_id"]
+            team_id_to_elo[tid] = elo_by_team[spelling]["elo"]
 
     # Process seeds: strip trailing letters (W16a -> W16), get TeamID, TeamName
     seed_to_teams = {}  # "W01" -> [(TeamID, TeamName), ...] for play-ins
@@ -92,7 +114,7 @@ def main():
             bracket_seeds.append(f"{reg}{s:02d}")
 
     # For each bracket slot, pick the team (filter play-in losers)
-    ordered_teams = []
+    ordered_teams = []  # list of (tid, tname) or None
     for seed in bracket_seeds:
         candidates = seed_to_teams.get(seed, [])
         if not candidates:
@@ -107,18 +129,26 @@ def main():
         # If all excluded (shouldn't happen), take first
         if not kept:
             kept = candidates
-        ordered_teams.append(kept[0][1])  # TeamName
+        ordered_teams.append(kept[0])
 
-    # Build flat bracket format: { south: {"1": team, "2": team, ...}, west, midwest, east }
+    # Build flat bracket format: { south: {"1": {name, elo}, ...}, west, midwest, east }
     # Keys are actual seed numbers (1-16), not slot indices. Flat bracket looks up by seed.
     result = {"south": {}, "west": {}, "midwest": {}, "east": {}}
-    for i, team in enumerate(ordered_teams):
+    for i, slot in enumerate(ordered_teams):
         reg_idx = i // 16
         seed_idx = i % 16
         ncaa_reg = REGION_ORDER[reg_idx]
         flat_reg = NCAA_TO_FLAT[ncaa_reg]
         seed_key = str(SEED_ORDER[seed_idx])  # actual seed: "1", "16", "8", "9", ...
-        result[flat_reg][seed_key] = team or f"TBD{seed_key}"
+        if slot is None:
+            result[flat_reg][seed_key] = f"TBD{seed_key}"
+        else:
+            tid, tname = slot
+            elo = team_id_to_elo.get(tid)
+            if elo is not None and elo > 0:
+                result[flat_reg][seed_key] = {"name": tname, "elo": round(elo, 2)}
+            else:
+                result[flat_reg][seed_key] = {"name": tname, "elo": None}
 
     base = Path(__file__).parent
     for name in ("teams.json", "bracket.json"):

@@ -7,6 +7,13 @@
 // Default team color for path styling (when no logo color available)
 var DEFAULT_TEAM_COLOR = [66, 133, 244]; // blue
 
+function eloWinProb(eloA, eloB) {
+  if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return null;
+  if (eloB === 0) return 1;
+  if (eloA === 0) return 0;
+  return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
+}
+
 function indexToLetter(index) {
   var result = '';
   index++;
@@ -198,7 +205,8 @@ function main(teams, size) {
   var radius = 400,
       logoheight = 30,
       root = buildtree(teams, size),
-      allNodes = collectNodes(root);
+      allNodes = collectNodes(root),
+      grayedTeams = new Set();
 
   var partition = d3.layout.partition()
     .sort(null)
@@ -257,8 +265,10 @@ function main(teams, size) {
 
   function fillpath(game) {
     if (!game || !game.team) return;
-    var color = game.team.color || DEFAULT_TEAM_COLOR;
-    var alpha = 0.6;
+    var color = grayedTeams.has(game.team.name)
+      ? [180, 180, 180]
+      : (game.team.color || DEFAULT_TEAM_COLOR);
+    var alpha = grayedTeams.has(game.team.name) ? 0.5 : 0.6;
 
     var leaf = findLeaf(game);
     var path = [];
@@ -324,7 +334,7 @@ function main(teams, size) {
   function updateDisplay() {
     clearPaths();
     var gamesWithTeam = allNodes.filter(function(n) {
-      return n.team && n.round > 1;
+      return n.team;
     });
     gamesWithTeam.sort(function(a, b) { return b.round - a.round; });
     gamesWithTeam.forEach(function(game) {
@@ -398,8 +408,12 @@ function main(teams, size) {
   }
 
   function arcCenter(d) {
+    return arcCenterAt(d, 0.5);
+  }
+
+  function arcCenterAt(d, fraction) {
     if (d.x == null || d.dx == null || d.y == null || d.dy == null) return [0, 0];
-    var midAngle = d.x + d.dx / 2;
+    var angle = d.x + d.dx * fraction;
     var r1 = d.y, r2 = d.y + d.dy;
     var theta = d.dx;
     var midRadius;
@@ -409,8 +423,8 @@ function main(teams, size) {
       var r2s = r2 * r2, r1s = r1 * r1, r2c = r2s * r2, r1c = r1s * r1;
       midRadius = (4 * Math.sin(theta / 2) * (r2c - r1c)) / (3 * theta * (r2s - r1s));
     }
-    var x = midRadius * Math.sin(midAngle);
-    var y = -midRadius * Math.cos(midAngle);
+    var x = midRadius * Math.sin(angle);
+    var y = -midRadius * Math.cos(angle);
     var multipliers = { 4: 1.03, 5: 1.15, 6: 1.4, 7: 1.2 };
     if (multipliers[d.round]) {
       var m = multipliers[d.round];
@@ -419,20 +433,114 @@ function main(teams, size) {
     return [x, y];
   }
 
+  function isFrontierMatchup(node) {
+    var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+    if (!node || !node.children || node.children.length !== 2) return false;
+    if (node.round <= config.startRound) return false;
+    if (node.team) return false;
+    return node.children[0].team && node.children[1].team;
+  }
+
+  function buildTeamNameToElo() {
+    var map = {};
+    allNodes.forEach(function(n) {
+      if (n.team && n.team.name && n.team.elo != null && Number.isFinite(n.team.elo)) {
+        map[n.team.name] = n.team.elo;
+      }
+    });
+    return map;
+  }
+
+  function updateLogoOpacity() {
+    allNodes.forEach(function(game) {
+      var logoG = d3.select("#game" + game.gid).select(".logo");
+      if (logoG.empty()) return;
+      if (isFrontierMatchup(game)) {
+        logoG.selectAll("g").each(function(_, i) {
+          var grayed = grayedTeams.has(game.children[i].team.name);
+          d3.select(this)
+            .style("opacity", grayed ? "0.4" : "1")
+            .style("filter", grayed ? "grayscale(100%)" : "none");
+        });
+        return;
+      }
+      logoG.style("opacity", grayedTeams.has(game.team && game.team.name) ? "0.4" : "1");
+    });
+  }
+
   function updateLogos() {
     function logoTransform(d) {
       var c = arcCenter(d);
       return trans(c[0] - logoheight/2, c[1] - logoheight/2);
     }
 
+    var teamNameToElo = buildTeamNameToElo();
+    var hasElo = Object.keys(teamNameToElo).length > 0;
+
     allNodes.forEach(function(game) {
       var logoG = d3.select("#game" + game.gid).select(".logo");
       if (logoG.empty()) return;
-      logoG.selectAll("*").remove();
 
-      if (game.team) {
-        var gid = game.gid;
-        var teamName = game.team.name;
+      if (hasElo && isFrontierMatchup(game)) {
+        var c0 = game.children[0].team;
+        var c1 = game.children[1].team;
+        var elo0 = teamNameToElo[c0.name];
+        var elo1 = teamNameToElo[c1.name];
+        var p0 = (elo0 != null && elo1 != null) ? eloWinProb(elo0, elo1) : null;
+        var p1 = (elo0 != null && elo1 != null) ? eloWinProb(elo1, elo0) : null;
+        var key = "frontier:" + (c0.name || "") + ":" + (c1.name || "");
+        if (game._lastLogoTeam === key) return;
+        game._lastLogoTeam = key;
+        logoG.selectAll("*").remove();
+        [0, 1].forEach(function(slot) {
+          var team = slot === 0 ? c0 : c1;
+          var pct = slot === 0 ? p0 : p1;
+          var frac = slot === 0 ? 0.25 : 0.75;
+          var c = arcCenterAt(game, frac);
+          var g = logoG.append("g").attr("transform", trans(c[0], c[1]));
+          g.style("opacity", grayedTeams.has(team.name) ? "0.4" : "1");
+          g.style("filter", grayedTeams.has(team.name) ? "grayscale(100%)" : "none");
+          var img = g.append("image")
+            .attr("xlink:href", "logos/"+team.name+".png")
+            .attr("x", -logoheight/2)
+            .attr("y", -logoheight/2)
+            .attr("width", logoheight)
+            .attr("height", logoheight);
+          img.on("error", function() {
+            d3.select(this).remove();
+            g.append("text")
+              .attr("text-anchor", "middle")
+              .attr("dominant-baseline", "central")
+              .attr("x", 0)
+              .attr("y", 0)
+              .style("font-size", "14px")
+              .style("font-weight", "bold")
+              .style("fill", "#333")
+              .text(team.name);
+          });
+          if (pct != null) {
+            g.append("text")
+              .attr("text-anchor", "middle")
+              .attr("x", 0)
+              .attr("y", logoheight/2 + 8)
+              .style("font-size", "11px")
+              .style("fill", "#333")
+              .text(Math.round(pct * 100) + "%");
+          }
+        });
+        return;
+      }
+
+      var teamName = game.team ? game.team.name : null;
+      if (game._lastLogoTeam === teamName) {
+        logoG.style("opacity", grayedTeams.has(teamName) ? "0.4" : "1");
+        return;
+      }
+      game._lastLogoTeam = teamName;
+      logoG.selectAll("*").remove();
+      logoG.style("opacity", grayedTeams.has(teamName) ? "0.4" : "1");
+
+      if (teamName) {
         var img = logoG.append("image")
           .attr("xlink:href", "logos/"+teamName+".png")
           .attr("transform", logoTransform(game))
@@ -457,7 +565,16 @@ function main(teams, size) {
   }
 
   arcs.on('click', function(d) {
-    if (d.team && d.parent) {
+    if (!d.team) return;
+    if (d3.event.ctrlKey || d3.event.metaKey) {
+      if (grayedTeams.has(d.team.name)) {
+        grayedTeams.delete(d.team.name);
+      } else {
+        grayedTeams.add(d.team.name);
+      }
+      updateDisplay();
+      updateLogoOpacity();
+    } else if (d.parent) {
       advanceTeam(d);
     }
   })
@@ -560,6 +677,7 @@ function main(teams, size) {
   };
 
   window.bracketReset = function() {
+    grayedTeams.clear();
     function clearWinners(node) {
       var hasChildren = node.children && node.children.length > 0;
       if (hasChildren) node.team = undefined;
