@@ -1001,14 +1001,18 @@ function main(teams, size) {
     simulateBtn.onclick = function() {
       simulateBtn.disabled = true;
       simulateStatus.textContent = 'Running…';
+      var startTime = performance.now();
       var done = function(result) {
+        var elapsed = (performance.now() - startTime) / 1000;
+        var elapsedStr = elapsed >= 1 ? elapsed.toFixed(2) + 's' : (elapsed * 1000).toFixed(0) + 'ms';
+        var timestamp = new Date().toLocaleTimeString();
         if (result && result.error) {
-          simulateStatus.textContent = result.error;
+          simulateStatus.textContent = result.error + ' — ' + timestamp + ' — ' + elapsedStr;
         } else {
           window.bracketSimResults = result;
           var msg = 'Done (' + (result ? result.nsims : 0) + ' sims';
           if (result && result.fromPartialState) msg += ', from current bracket';
-          msg += ')';
+          msg += ') — ' + timestamp + ' — ' + elapsedStr;
           simulateStatus.textContent = msg;
         }
         simulateBtn.disabled = false;
