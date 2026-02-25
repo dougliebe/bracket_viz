@@ -71,15 +71,38 @@ function flatToRslot(gid) {
   return gid;
 }
 
-function getGameDay(gid, round, size) {
+function getGameDay(gid, round, size, node) {
   if (size !== 64) return null;
   if (round === 1) {
+    /* Each R64 game has 2 gids (2 team slots). Both must return same day. Use gameIdx = floor((gid - base) / 2). */
+    var reg = regionFromGid(gid);
+    if (reg === 'east') {
+      var gameIdx = Math.floor((gid - 49) / 2);
+      var eastBracketGame = [8, 7, 6, 4, 3, 5, 2, 1];
+      var bracketGame = eastBracketGame[gameIdx];
+      var eastDayByBracket = { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 2 };
+      return eastDayByBracket[bracketGame] === 1 ? 'day1' : 'day2';
+    }
+    if (reg === 'midwest') {
+      var gameIdx = Math.floor((gid - 33) / 2);
+      var mwBracketGame = [8, 7, 6, 4, 3, 5, 2, 1];
+      var bracketGame = mwBracketGame[gameIdx];
+      var mwDayByBracket = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 2, 7: 2, 8: 1 };
+      return mwDayByBracket[bracketGame] === 1 ? 'day1' : 'day2';
+    }
     var rSlot = flatToRslot(gid);
     var gameIdx = Math.floor((rSlot - 1) / 2);
     var r64 = [2,2,2,2,1,1,2,2,1,1,1,1,2,2,1,1, 1,1,1,1,2,2,2,2,2,2,2,2,1,1,1,1];
     return r64[gameIdx] === 1 ? 'day1' : 'day2';
   }
   if (round === 2) {
+    /* R32 game inherits day from its R64 children: if both R64 games are day 1, R32 is day 1 */
+    if (node && node.children && node.children.length === 2) {
+      var c0 = node.children[0], c1 = node.children[1];
+      if (c0.round === 1 && c1.round === 1) {
+        return getGameDay(c0.gid, 1, size);
+      }
+    }
     var r32 = [4,4,3,4,3,3,4,3,3,3,4,4,4,4,3,3];
     var gameIdx = gid - 65;
     return r32[Math.floor(gameIdx / 2)] === 3 ? 'day1' : 'day2';
@@ -448,7 +471,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
 
   function getCellDayColor(node) {
     if (size !== 64) return null;
-    var day = getGameDay(node.gid, node.round, size);
+    var day = getGameDay(node.gid, node.round, size, node);
     return day ? DAY_COLORS[day] : null;
   }
 
