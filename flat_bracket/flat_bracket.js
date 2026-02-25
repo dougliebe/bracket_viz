@@ -370,6 +370,12 @@ function isFrontierMatchup(node, size) {
   return node.children[0].team && node.children[1].team;
 }
 
+function isDeepestAdvancedNode(node) {
+  if (!node || !node.team) return false;
+  if (!node.parent) return true;
+  return !node.parent.team || node.parent.team.name !== node.team.name;
+}
+
 function buildTeamNameToElo(allNodes) {
   var map = {};
   allNodes.forEach(function(n) {
@@ -382,7 +388,7 @@ function buildTeamNameToElo(allNodes) {
 
 var ROUND_LABELS = ['Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Reach championship', 'Win it all'];
 
-function showSimTooltip(teamName, evt) {
+function showSimTooltip(teamName, node, evt) {
   var tooltip = document.getElementById('simTooltip');
   if (!tooltip) return;
   var results = window.bracketSimResults;
@@ -391,6 +397,18 @@ function showSimTooltip(teamName, evt) {
   var lines = [teamName];
   for (var i = 0; i < ra.length && i < ROUND_LABELS.length; i++) {
     lines.push(ROUND_LABELS[i] + ': ' + Math.round(ra[i] * 100) + '%');
+  }
+  if (node && isDeepestAdvancedNode(node) && results.winRoundLoseNext && results.winRoundLoseNext[teamName]) {
+    var wln = results.winRoundLoseNext[teamName];
+    var pLoseNext = null;
+    if (node.round >= 1 && node.round <= 5 && wln['r' + node.round] != null) {
+      pLoseNext = wln['r' + node.round];
+    } else if (node.round === 6 && ra[5] != null) {
+      pLoseNext = Math.max(0, ra[5] - (wln.champ || 0));
+    }
+    if (pLoseNext != null) {
+      lines.push('P(lose next): ' + Math.round(pLoseNext * 100) + '%');
+    }
   }
   tooltip.innerHTML = lines.join('<br>');
   tooltip.classList.add('visible');
@@ -519,7 +537,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
           imgWrap.style('opacity', grayedTeams.has(t.name) ? '0.4' : '1');
           imgWrap.style('filter', grayedTeams.has(t.name) ? 'grayscale(100%)' : 'none');
           imgWrap.on('mouseenter', function() {
-            showSimTooltip(t.name, d3.event);
+            showSimTooltip(t.name, node.children[slot], d3.event);
           });
           imgWrap.on('mouseleave', hideSimTooltip);
           var img = imgWrap.append('image')
@@ -620,7 +638,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             advanceTeam(node, update);
           }
         });
-        g.on('mouseenter', function() { showSimTooltip(node.team.name, d3.event); });
+        g.on('mouseenter', function() { showSimTooltip(node.team.name, node, d3.event); });
         g.on('mouseleave', hideSimTooltip);
       }
     });
@@ -654,7 +672,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             advanceTeam(node, update);
           }
         });
-        g.on('mouseenter', function() { showSimTooltip(node.team.name, d3.event); });
+        g.on('mouseenter', function() { showSimTooltip(node.team.name, node, d3.event); });
         g.on('mouseleave', hideSimTooltip);
       }
     });
