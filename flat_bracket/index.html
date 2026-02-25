@@ -43,18 +43,39 @@
     .team-cell text.logo-fallback {
       fill: #333333;
     }
+    .sim-tooltip {
+      position: fixed;
+      z-index: 1000;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 12px;
+      border-radius: 6px;
+      pointer-events: none;
+      display: none;
+      max-width: 220px;
+      line-height: 1.4;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .sim-tooltip.visible {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div class="controls">
     <button id="resetBtn">Reset</button>
     <button id="randomBtn">Random</button>
+    <button id="simulateBtn">Run 100k Simulations</button>
+    <span id="simulateStatus"></span>
     <span>Click a team to advance them. Ctrl+click to gray out all cells for that team (toggle).</span>
   </div>
   <div id="bracket"></div>
+  <div id="simTooltip" class="sim-tooltip"></div>
 
   <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
   <script src="https://d3js.org/queue.v1.min.js"></script>
+  <script src="simulation.js"></script>
   <script src="flat_bracket.js"></script>
 </body>
 </html>

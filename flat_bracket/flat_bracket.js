@@ -380,6 +380,36 @@ function buildTeamNameToElo(allNodes) {
   return map;
 }
 
+var ROUND_LABELS = ['Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Reach championship', 'Win it all'];
+
+function showSimTooltip(teamName, evt) {
+  var tooltip = document.getElementById('simTooltip');
+  if (!tooltip) return;
+  var results = window.bracketSimResults;
+  if (!results || !results.reachAtLeast || !results.reachAtLeast[teamName]) return;
+  var ra = results.reachAtLeast[teamName];
+  var lines = [teamName];
+  for (var i = 0; i < ra.length && i < ROUND_LABELS.length; i++) {
+    lines.push(ROUND_LABELS[i] + ': ' + Math.round(ra[i] * 100) + '%');
+  }
+  tooltip.innerHTML = lines.join('<br>');
+  tooltip.classList.add('visible');
+  var x = (evt && evt.clientX != null) ? evt.clientX : 0;
+  var y = (evt && evt.clientY != null) ? evt.clientY : 0;
+  var offset = 12;
+  var left = x + offset;
+  var top = y + offset;
+  if (left + 220 > window.innerWidth) left = x - 220 - offset;
+  if (top + 120 > window.innerHeight) top = y - 120 - offset;
+  tooltip.style.left = left + 'px';
+  tooltip.style.top = top + 'px';
+}
+
+function hideSimTooltip() {
+  var tooltip = document.getElementById('simTooltip');
+  if (tooltip) tooltip.classList.remove('visible');
+}
+
 function render(root, allNodes, container, width, height, grayedTeams, size) {
   grayedTeams = grayedTeams || new Set();
   size = size || 64;
@@ -484,9 +514,14 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
           var imgWrap = g.append('g')
             .attr('class', 'frontier-logo')
             .attr('data-team', t.name)
-            .attr('transform', 'translate(' + x + ', 2)');
+            .attr('transform', 'translate(' + x + ', 2)')
+            .style('cursor', 'pointer');
           imgWrap.style('opacity', grayedTeams.has(t.name) ? '0.4' : '1');
           imgWrap.style('filter', grayedTeams.has(t.name) ? 'grayscale(100%)' : 'none');
+          imgWrap.on('mouseenter', function() {
+            showSimTooltip(t.name, d3.event);
+          });
+          imgWrap.on('mouseleave', hideSimTooltip);
           var img = imgWrap.append('image')
             .attr('xlink:href', LOGO_PATH + t.name + '.png')
             .attr('x', 0)
@@ -585,6 +620,8 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             advanceTeam(node, update);
           }
         });
+        g.on('mouseenter', function() { showSimTooltip(node.team.name, d3.event); });
+        g.on('mouseleave', hideSimTooltip);
       }
     });
 
@@ -602,6 +639,8 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
     cells.each(function(node) {
       var g = d3.select(this);
       g.on('click', null);
+      g.on('mouseenter', null);
+      g.on('mouseleave', null);
       if (node.team) {
         g.on('click', function() {
           if (d3.event.ctrlKey || d3.event.metaKey) {
@@ -615,6 +654,8 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             advanceTeam(node, update);
           }
         });
+        g.on('mouseenter', function() { showSimTooltip(node.team.name, d3.event); });
+        g.on('mouseleave', hideSimTooltip);
       }
     });
 
@@ -798,6 +839,37 @@ function main(teams, size) {
     clearWinners(root);
     currentUpdate();
   };
+
+  var simulateBtn = document.getElementById('simulateBtn');
+  var simulateStatus = document.getElementById('simulateStatus');
+  if (simulateBtn && simulateStatus) {
+    simulateBtn.onclick = function() {
+      simulateBtn.disabled = true;
+      simulateStatus.textContent = 'Running…';
+      var done = function(result) {
+        if (result && result.error) {
+          simulateStatus.textContent = result.error;
+        } else {
+          window.bracketSimResults = result;
+          var msg = 'Done (' + (result ? result.nsims : 0) + ' sims';
+          if (result && result.fromPartialState) msg += ', from current bracket';
+          msg += ')';
+          simulateStatus.textContent = msg;
+        }
+        simulateBtn.disabled = false;
+      };
+      window.BracketSimulation.run(allNodes, 100000, function(err, result) {
+        if (err) {
+          simulateStatus.textContent = 'Workers failed, running on main thread…';
+          setTimeout(function() {
+            done(window.BracketSimulation.run(allNodes, 100000));
+          }, 0);
+        } else {
+          done(result);
+        }
+      });
+    };
+  }
 }
 
 var fullTeams = null;
