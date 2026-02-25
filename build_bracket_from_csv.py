@@ -3,20 +3,20 @@
 Build teams.json for the flat bracket from NCAA Kaggle CSV data.
 Replicates the R logic from READ_CSVS.md: load 2025 seeds, join with team names,
 filter play-in losers, and output in NCAA bracket order for south/west/midwest/east.
+
+Data directory: Set NCAA_DATA_DIR env var or use --data-dir to point at your Kaggle
+CSV folder (containing MNCAATourneySeeds.csv, MTeams.csv, MTeamSpellings.csv, etc.).
 """
 
+import argparse
 import csv
 import json
+import os
 import re
 from pathlib import Path
 
-# CSV paths (from user's R script)
-DATA_DIR = Path("D:/ANALYTICS/ncaa/data")
-SEEDS_CSV = DATA_DIR / "MNCAATourneySeeds.csv"
-TEAMS_CSV = DATA_DIR / "MTeams.csv"
-SPELLINGS_CSV = DATA_DIR / "MTeamSpellings.csv"
-ELO_CSV = DATA_DIR / "data-KjK2N.csv"
-
+# Default data dir (used when NCAA_DATA_DIR and --data-dir are not set)
+_DEFAULT_DATA_DIR = "D:/ANALYTICS/ncaa/data"
 # Play-in losers to exclude (elo row IDs from data-KjK2N.csv)
 EXCLUDE_ELO_IDS = {208, 55, 43, 282}
 
@@ -35,6 +35,20 @@ def load_csv(path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Build teams.json and bracket.json from NCAA Kaggle CSV data.")
+    parser.add_argument(
+        "--data-dir",
+        default=os.environ.get("NCAA_DATA_DIR", _DEFAULT_DATA_DIR),
+        help="Path to Kaggle CSV folder (or set NCAA_DATA_DIR env var)",
+    )
+    args = parser.parse_args()
+    data_dir = Path(args.data_dir)
+
+    SEEDS_CSV = data_dir / "MNCAATourneySeeds.csv"
+    TEAMS_CSV = data_dir / "MTeams.csv"
+    SPELLINGS_CSV = data_dir / "MTeamSpellings.csv"
+    ELO_CSV = data_dir / "data-KjK2N.csv"
+
     season = 2025
 
     # Load seeds for 2025

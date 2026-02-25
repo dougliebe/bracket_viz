@@ -3,7 +3,7 @@
  * Click teams to advance them. Reuses logos and team logic from radial bracket.
  */
 
-var LOGO_PATH = '/logos/';
+var LOGO_PATH = '../logos/';
 var LOGO_SIZE = 20;   /* 1.5x smaller: 30 / 1.5 */
 var CELL_WIDTH = 94;  /* 1.5x smaller: 140 / 1.5 */
 var CELL_HEIGHT = 24; /* 1.5x smaller: 36 / 1.5 */
