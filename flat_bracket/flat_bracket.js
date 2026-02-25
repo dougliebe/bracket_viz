@@ -3,7 +3,7 @@
  * Click teams to advance them. Reuses logos and team logic from radial bracket.
  */
 
-var LOGO_PATH = '../logos/';
+var LOGO_PATH = '/logos/';
 var LOGO_SIZE = 20;   /* 1.5x smaller: 30 / 1.5 */
 var CELL_WIDTH = 94;  /* 1.5x smaller: 140 / 1.5 */
 var CELL_HEIGHT = 24; /* 1.5x smaller: 36 / 1.5 */
@@ -45,6 +45,52 @@ function getSeedForGid(gid) {
   if (gid >= 33 && gid <= 48) return l_to_r[(gid - 33) % 16];
   if (gid >= 49 && gid <= 64) return l_to_r[(gid - 49) % 16];
   return '';
+}
+
+function regionFromGid(gid) {
+  if ((gid >= 1 && gid <= 16) || (gid >= 65 && gid <= 72) ||
+      (gid >= 97 && gid <= 100) ||
+      (gid == 113 || gid == 114 || gid == 121)) return 'south';
+  if ((gid >= 17 && gid <= 32) || (gid >= 73 && gid <= 80) ||
+      (gid >= 101 && gid <= 104) ||
+      (gid == 115 || gid == 116 || gid == 122)) return 'west';
+  if ((gid >= 33 && gid <= 48) || (gid >= 81 && gid <= 88) ||
+      (gid >= 105 && gid <= 108) ||
+      (gid == 117 || gid == 118 || gid == 123)) return 'midwest';
+  if ((gid >= 49 && gid <= 64) || (gid >= 89 && gid <= 96) ||
+      (gid >= 109 && gid <= 112) ||
+      (gid == 119 || gid == 120 || gid == 124)) return 'east';
+  return null;
+}
+
+function flatToRslot(gid) {
+  if (gid >= 49 && gid <= 64) return gid - 48;
+  if (gid >= 33 && gid <= 48) return gid - 16;
+  if (gid >= 1 && gid <= 16) return gid + 32;
+  if (gid >= 17 && gid <= 32) return gid + 32;
+  return gid;
+}
+
+function getGameDay(gid, round, size) {
+  if (size !== 64) return null;
+  if (round === 1) {
+    var rSlot = flatToRslot(gid);
+    var gameIdx = Math.floor((rSlot - 1) / 2);
+    var r64 = [2,2,2,2,1,1,2,2,1,1,1,1,2,2,1,1, 1,1,1,1,2,2,2,2,2,2,2,2,1,1,1,1];
+    return r64[gameIdx] === 1 ? 'day1' : 'day2';
+  }
+  if (round === 2) {
+    var r32 = [4,4,3,4,3,3,4,3,3,3,4,4,4,4,3,3];
+    var gameIdx = gid - 65;
+    return r32[Math.floor(gameIdx / 2)] === 3 ? 'day1' : 'day2';
+  }
+  if (round === 3) {
+    var reg = regionFromGid(gid);
+    if (!reg) return null;
+    var dayByRegion = { south: 'day2', west: 'day1', midwest: 'day2', east: 'day1' };
+    return dayByRegion[reg] || null;
+  }
+  return null;
 }
 
 function buildtree(teams, size) {
@@ -344,9 +390,19 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
     .attr('width', width)
     .attr('height', height);
 
+  var dayBgGroup = svg.append('g').attr('class', 'day-backgrounds');
   var linesGroup = svg.append('g').attr('class', 'lines');
   var cellsGroup = svg.append('g').attr('class', 'cells');
   var labelsGroup = svg.append('g').attr('class', 'labels');
+  var legendGroup = svg.append('g').attr('class', 'day-legend');
+
+  var DAY_COLORS = { day1: '#e0f2fe', day2: '#fef3c7' };
+
+  function getCellDayColor(node) {
+    if (size !== 64) return null;
+    var day = getGameDay(node.gid, node.round, size);
+    return day ? DAY_COLORS[day] : null;
+  }
 
   function updateGrayState() {
     cellsGroup.selectAll('g.team-cell').each(function() {
@@ -354,9 +410,10 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       var gid = parseInt(g.attr('id').replace('game', ''), 10);
       var node = allNodes.filter(function(n) { return n.gid === gid; })[0];
       if (!node) return;
+      var baseFill = getCellDayColor(node) || '#fff';
       if (node.team) {
         var isGrayed = grayedTeams.has(node.team.name);
-        g.select('rect').attr('fill', isGrayed ? '#b4b4b4' : '#fff');
+        g.select('rect').attr('fill', isGrayed ? '#b4b4b4' : baseFill);
       } else if (isFrontierMatchup(node, size)) {
         g.selectAll('g.frontier-logo').each(function() {
           var teamName = d3.select(this).attr('data-team');
@@ -459,6 +516,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
         .attr('xlink:href', LOGO_PATH + team.name + '.png')
         .attr('width', LOGO_SIZE)
         .attr('height', LOGO_SIZE)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
         .on('error', function() {
           d3.select(this).remove();
           if (!isRound1) {
@@ -491,7 +549,10 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       .attr('height', CELL_HEIGHT)
       .attr('rx', 3)
       .attr('ry', 3)
-      .attr('fill', function(d) { return (d.team && grayedTeams.has(d.team.name)) ? '#b4b4b4' : '#fff'; })
+      .attr('fill', function(d) {
+        if (d.team && grayedTeams.has(d.team.name)) return '#b4b4b4';
+        return getCellDayColor(d) || '#ffffff';
+      })
       .attr('stroke', '#333')
       .attr('stroke-width', 1);
 
@@ -534,7 +595,8 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       .style('cursor', function(d) { return d.team ? 'pointer' : 'default'; });
 
     cells.select('rect').attr('fill', function(d) {
-      return (d.team && grayedTeams.has(d.team.name)) ? '#b4b4b4' : '#fff';
+      if (d.team && grayedTeams.has(d.team.name)) return '#b4b4b4';
+      return getCellDayColor(d) || '#fff';
     });
 
     cells.each(function(node) {
@@ -609,11 +671,77 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       .style('font-weight', 'bold')
       .style('fill', '#555')
       .text(function(d) { return d.text; });
+
+    legendGroup.selectAll('*').remove();
+    if (size === 64) {
+      var legendTop = height - LEGEND_HEIGHT;
+      var legendCenterX = width / 2;
+      var boxSize = 18;
+      var boxGap = 8;
+      var rowHeight = 28;
+      var labelWidth = 90;
+      var totalLegendWidth = labelWidth + boxGap + boxSize + boxGap + boxSize;
+      var legendLeft = legendCenterX - totalLegendWidth / 2;
+      var legendRows = [
+        { label: 'Round of 64', y: legendTop + 22 },
+        { label: 'Round of 32', y: legendTop + 22 + rowHeight },
+        { label: 'Sweet 16', y: legendTop + 22 + rowHeight * 2 }
+      ];
+      legendRows.forEach(function(row) {
+        var day1X = legendLeft + labelWidth + boxGap;
+        var day2X = day1X + boxSize + boxGap;
+        legendGroup.append('text')
+          .attr('class', 'legend-label')
+          .attr('x', legendLeft + labelWidth)
+          .attr('y', row.y)
+          .attr('text-anchor', 'end')
+          .attr('dominant-baseline', 'middle')
+          .style('font-size', '12px')
+          .style('fill', '#333')
+          .text(row.label);
+        legendGroup.append('rect')
+          .attr('class', 'legend-box legend-day1')
+          .attr('x', day1X)
+          .attr('y', row.y - boxSize / 2)
+          .attr('width', boxSize)
+          .attr('height', boxSize)
+          .attr('rx', 2)
+          .attr('fill', DAY_COLORS.day1)
+          .attr('stroke', '#333')
+          .attr('stroke-width', 1);
+        legendGroup.append('rect')
+          .attr('class', 'legend-box legend-day2')
+          .attr('x', day2X)
+          .attr('y', row.y - boxSize / 2)
+          .attr('width', boxSize)
+          .attr('height', boxSize)
+          .attr('rx', 2)
+          .attr('fill', DAY_COLORS.day2)
+          .attr('stroke', '#333')
+          .attr('stroke-width', 1);
+      });
+      legendGroup.append('text')
+        .attr('x', legendLeft + labelWidth + boxGap + boxSize / 2)
+        .attr('y', legendTop + 8)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '10px')
+        .style('fill', '#555')
+        .text('Day 1');
+      legendGroup.append('text')
+        .attr('x', legendLeft + labelWidth + boxGap + boxSize + boxGap + boxSize / 2)
+        .attr('y', legendTop + 8)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '10px')
+        .style('fill', '#555')
+        .text('Day 2');
+    }
   }
 
   update();
   return update;
 }
+
+var LEGEND_HEIGHT = 100;
 
 function getBracketDimensions() {
   var controlsHeight = 52;
@@ -628,18 +756,20 @@ function main(teams, size) {
   var dims = getBracketDimensions();
   var width = dims.width;
   var height = dims.height;
+  var contentHeight = height - (size === 64 ? LEGEND_HEIGHT : 0);
   var grayedTeams = new Set();
 
   var root = buildtree(teams, size);
   setParents(root, null);
   var allNodes = collectNodes(root);
-  computePositions(root, width, height);
+  computePositions(root, width, contentHeight);
 
   var currentUpdate = render(root, allNodes, '#bracket', width, height, grayedTeams, size);
 
   window.addEventListener('resize', function onResize() {
     var d = getBracketDimensions();
-    computePositions(root, d.width, d.height);
+    var ch = d.height - (size === 64 ? LEGEND_HEIGHT : 0);
+    computePositions(root, d.width, ch);
     currentUpdate = render(root, allNodes, '#bracket', d.width, d.height, grayedTeams, size);
   });
 
