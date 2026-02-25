@@ -385,6 +385,108 @@ function loadTeams(data) {
   return teams;
 }
 
+/**
+ * Serialize bracket state for export.
+ * Returns { version, advances, grayed } where advances is { gid: teamName }.
+ */
+function serializeState(root, grayedTeams) {
+  var advances = {};
+  collectNodes(root).forEach(function(node) {
+    if (node.children && node.children.length > 0 && node.team && node.team.name) {
+      advances[node.gid] = node.team.name;
+    }
+  });
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    advances: advances,
+    grayed: Array.from(grayedTeams || [])
+  };
+}
+
+/**
+ * Build map of team name -> team object from leaf nodes.
+ */
+function buildTeamNameToTeam(allNodes) {
+  var map = {};
+  allNodes.forEach(function(n) {
+    if (n.round === 1 && n.team && n.team.name) {
+      map[n.team.name] = n.team;
+    }
+  });
+  return map;
+}
+
+/**
+ * Validate imported state. Returns { valid: boolean, error?: string }.
+ */
+function validateState(state, allNodes) {
+  if (!state || typeof state !== 'object') {
+    return { valid: false, error: 'Invalid state: not an object' };
+  }
+  var advances = state.advances;
+  var grayed = state.grayed;
+  if (!advances || typeof advances !== 'object') {
+    return { valid: false, error: 'Invalid state: missing or invalid advances' };
+  }
+  if (state.version !== 1 && state.version !== undefined) {
+    return { valid: false, error: 'Unsupported state version' };
+  }
+  if (grayed != null && !Array.isArray(grayed)) {
+    return { valid: false, error: 'Invalid state: grayed must be an array' };
+  }
+  var validGids = {};
+  allNodes.forEach(function(n) { validGids[n.gid] = true; });
+  for (var gid in advances) {
+    var g = parseInt(gid, 10);
+    if (isNaN(g) || !validGids[g]) {
+      return { valid: false, error: 'Invalid state: unknown gid ' + gid };
+    }
+    if (typeof advances[gid] !== 'string') {
+      return { valid: false, error: 'Invalid state: advances values must be team names' };
+    }
+  }
+  return { valid: true };
+}
+
+/**
+ * Apply imported state to bracket. Call currentUpdate() after.
+ */
+function applyState(root, grayedTeams, state, allNodes) {
+  var valid = validateState(state, allNodes);
+  if (!valid.valid) return valid;
+
+  function clearWinners(node) {
+    if (node.children && node.children.length > 0) node.team = undefined;
+    (node.children || []).forEach(clearWinners);
+  }
+  clearWinners(root);
+
+  grayedTeams.clear();
+  if (state.grayed && Array.isArray(state.grayed)) {
+    state.grayed.forEach(function(name) {
+      if (typeof name === 'string') grayedTeams.add(name);
+    });
+  }
+
+  var teamNameToTeam = buildTeamNameToTeam(allNodes);
+  var gidToNode = {};
+  allNodes.forEach(function(n) { gidToNode[n.gid] = n; });
+
+  var rounds = [2, 3, 4, 5, 6, 7];
+  rounds.forEach(function(r) {
+    allNodes.filter(function(n) { return n.round === r; }).forEach(function(node) {
+      var teamName = state.advances[node.gid];
+      if (teamName) {
+        var team = teamNameToTeam[teamName] || { name: teamName };
+        node.team = team;
+      }
+    });
+  });
+
+  return { valid: true };
+}
+
 function isFrontierMatchup(node, size) {
   var config = SIZE_CONFIG[size] || SIZE_CONFIG[64];
   if (!node || !node.children || node.children.length !== 2) return false;
@@ -881,6 +983,18 @@ function main(teams, size) {
     currentUpdate();
   };
 
+  window.bracketExportState = function() {
+    return serializeState(root, grayedTeams);
+  };
+  window.bracketImportState = function(state) {
+    var result = applyState(root, grayedTeams, state, allNodes);
+    if (result.valid) {
+      currentUpdate();
+      return { success: true };
+    }
+    return { success: false, error: result.error };
+  };
+
   var simulateBtn = document.getElementById('simulateBtn');
   var simulateStatus = document.getElementById('simulateStatus');
   if (simulateBtn && simulateStatus) {
@@ -937,3 +1051,106 @@ document.getElementById('resetBtn').onclick = function() {
 document.getElementById('randomBtn').onclick = function() {
   if (window.bracketRandom) window.bracketRandom();
 };
+
+(function setupExportImport() {
+  var exportBtn = document.getElementById('exportBtn');
+  var importBtn = document.getElementById('importBtn');
+  var importModal = document.getElementById('importModal');
+  var importPasteArea = document.getElementById('importPasteArea');
+  var importFileInput = document.getElementById('importFileInput');
+  var importError = document.getElementById('importError');
+  var importApplyBtn = document.getElementById('importApplyBtn');
+  var importCancelBtn = document.getElementById('importCancelBtn');
+
+  if (exportBtn) {
+    exportBtn.onclick = function() {
+      if (!window.bracketExportState) return;
+      var state = window.bracketExportState();
+      var json = JSON.stringify(state, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'bracket-state.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
+
+  function tryImport(jsonStr) {
+    var errEl = importError;
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+    try {
+      var state = JSON.parse(jsonStr);
+      if (!window.bracketImportState) {
+        errEl.textContent = 'Bracket not ready yet.';
+        errEl.style.display = 'block';
+        return;
+      }
+      var result = window.bracketImportState(state);
+      if (result.success) {
+        importModal.classList.remove('visible');
+        importPasteArea.value = '';
+        importFileInput.value = '';
+      } else {
+        errEl.textContent = result.error || 'Import failed.';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      errEl.textContent = 'Invalid JSON: ' + (e.message || String(e));
+      errEl.style.display = 'block';
+    }
+  }
+
+  if (importBtn) {
+    importBtn.onclick = function() {
+      importModal.classList.add('visible');
+      importError.style.display = 'none';
+      importPasteArea.value = '';
+      importFileInput.value = '';
+      importPasteArea.focus();
+    };
+  }
+
+  if (importFileInput) {
+    importFileInput.onchange = function() {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function() {
+        importPasteArea.value = reader.result || '';
+      };
+      reader.readAsText(file);
+    };
+  }
+
+  if (importApplyBtn) {
+    importApplyBtn.onclick = function() {
+      var text = importPasteArea.value.trim();
+      if (!text) {
+        importError.textContent = 'Paste JSON or select a file.';
+        importError.style.display = 'block';
+        return;
+      }
+      tryImport(text);
+    };
+  }
+
+  if (importCancelBtn) {
+    importCancelBtn.onclick = function() {
+      importModal.classList.remove('visible');
+      importPasteArea.value = '';
+      importFileInput.value = '';
+      importError.style.display = 'none';
+    };
+  }
+
+  if (importModal) {
+    importModal.onclick = function(evt) {
+      if (evt.target === importModal) {
+        importCancelBtn && importCancelBtn.click();
+      }
+    };
+  }
+})();
