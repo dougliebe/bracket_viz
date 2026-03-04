@@ -206,7 +206,7 @@ function main(teams, size) {
       logoheight = 30,
       root = buildtree(teams, size),
       allNodes = collectNodes(root),
-      grayedTeams = new Set();
+      grayedTeams = new Map(); // teamName -> round where burn starts (grayed from that round forward)
 
   var partition = d3.layout.partition()
     .sort(null)
@@ -263,13 +263,13 @@ function main(teams, size) {
     return game;
   }
 
+  function isBurnedAtRound(teamName, round) {
+    var burnRound = grayedTeams.get(teamName);
+    return burnRound != null && round >= burnRound;
+  }
+
   function fillpath(game) {
     if (!game || !game.team) return;
-    var color = grayedTeams.has(game.team.name)
-      ? [180, 180, 180]
-      : (game.team.color || DEFAULT_TEAM_COLOR);
-    var alpha = grayedTeams.has(game.team.name) ? 0.5 : 0.6;
-
     var leaf = findLeaf(game);
     var path = [];
     for (var n = leaf; n && n.gid !== game.gid; n = n.parent) {
@@ -278,6 +278,9 @@ function main(teams, size) {
     path.push(game);
 
     path.forEach(function(node) {
+      var burned = isBurnedAtRound(game.team.name, node.round);
+      var color = burned ? [180, 180, 180] : (game.team.color || DEFAULT_TEAM_COLOR);
+      var alpha = burned ? 0.5 : 0.6;
       var gameg = d3.select("#game" + node.gid);
       if (gameg.node()) gameg.select("path").style("fill", rgba(color, alpha));
     });
@@ -457,14 +460,14 @@ function main(teams, size) {
       if (logoG.empty()) return;
       if (isFrontierMatchup(game)) {
         logoG.selectAll("g").each(function(_, i) {
-          var grayed = grayedTeams.has(game.children[i].team.name);
+          var grayed = isBurnedAtRound(game.children[i].team.name, game.round);
           d3.select(this)
             .style("opacity", grayed ? "0.4" : "1")
             .style("filter", grayed ? "grayscale(100%)" : "none");
         });
         return;
       }
-      logoG.style("opacity", grayedTeams.has(game.team && game.team.name) ? "0.4" : "1");
+      logoG.style("opacity", isBurnedAtRound(game.team && game.team.name, game.round) ? "0.4" : "1");
     });
   }
 
@@ -498,8 +501,8 @@ function main(teams, size) {
           var frac = slot === 0 ? 0.25 : 0.75;
           var c = arcCenterAt(game, frac);
           var g = logoG.append("g").attr("transform", trans(c[0], c[1]));
-          g.style("opacity", grayedTeams.has(team.name) ? "0.4" : "1");
-          g.style("filter", grayedTeams.has(team.name) ? "grayscale(100%)" : "none");
+          g.style("opacity", isBurnedAtRound(team.name, game.round) ? "0.4" : "1");
+          g.style("filter", isBurnedAtRound(team.name, game.round) ? "grayscale(100%)" : "none");
           var img = g.append("image")
             .attr("xlink:href", "logos/"+team.name+".png")
             .attr("x", -logoheight/2)
@@ -533,12 +536,12 @@ function main(teams, size) {
 
       var teamName = game.team ? game.team.name : null;
       if (game._lastLogoTeam === teamName) {
-        logoG.style("opacity", grayedTeams.has(teamName) ? "0.4" : "1");
+        logoG.style("opacity", isBurnedAtRound(teamName, game.round) ? "0.4" : "1");
         return;
       }
       game._lastLogoTeam = teamName;
       logoG.selectAll("*").remove();
-      logoG.style("opacity", grayedTeams.has(teamName) ? "0.4" : "1");
+      logoG.style("opacity", isBurnedAtRound(teamName, game.round) ? "0.4" : "1");
 
       if (teamName) {
         var img = logoG.append("image")
@@ -570,7 +573,7 @@ function main(teams, size) {
       if (grayedTeams.has(d.team.name)) {
         grayedTeams.delete(d.team.name);
       } else {
-        grayedTeams.add(d.team.name);
+        grayedTeams.set(d.team.name, d.round);
       }
       updateDisplay();
       updateLogoOpacity();
@@ -677,7 +680,7 @@ function main(teams, size) {
   };
 
   window.bracketReset = function() {
-    grayedTeams.clear();
+    grayedTeams = new Map();
     function clearWinners(node) {
       var hasChildren = node.children && node.children.length > 0;
       if (hasChildren) node.team = undefined;

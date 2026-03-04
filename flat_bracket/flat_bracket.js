@@ -387,7 +387,8 @@ function loadTeams(data) {
 
 /**
  * Serialize bracket state for export.
- * Returns { version, advances, grayed } where advances is { gid: teamName }.
+ * Returns { version, advances, grayed } where advances is { gid: teamName },
+ * grayed is { teamName: round } (round where burn starts, grayed from that round forward).
  */
 function serializeState(root, grayedTeams) {
   var advances = {};
@@ -396,11 +397,17 @@ function serializeState(root, grayedTeams) {
       advances[node.gid] = node.team.name;
     }
   });
+  var grayedObj = {};
+  if (grayedTeams && grayedTeams.forEach) {
+    grayedTeams.forEach(function(round, teamName) {
+      grayedObj[teamName] = round;
+    });
+  }
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
     advances: advances,
-    grayed: Array.from(grayedTeams || [])
+    grayed: grayedObj
   };
 }
 
@@ -432,8 +439,8 @@ function validateState(state, allNodes) {
   if (state.version !== 1 && state.version !== undefined) {
     return { valid: false, error: 'Unsupported state version' };
   }
-  if (grayed != null && !Array.isArray(grayed)) {
-    return { valid: false, error: 'Invalid state: grayed must be an array' };
+  if (grayed != null && !Array.isArray(grayed) && (typeof grayed !== 'object')) {
+    return { valid: false, error: 'Invalid state: grayed must be an array or object' };
   }
   var validGids = {};
   allNodes.forEach(function(n) { validGids[n.gid] = true; });
@@ -463,10 +470,19 @@ function applyState(root, grayedTeams, state, allNodes) {
   clearWinners(root);
 
   grayedTeams.clear();
-  if (state.grayed && Array.isArray(state.grayed)) {
-    state.grayed.forEach(function(name) {
-      if (typeof name === 'string') grayedTeams.add(name);
-    });
+  if (state.grayed && typeof state.grayed === 'object') {
+    if (Array.isArray(state.grayed)) {
+      state.grayed.forEach(function(name) {
+        if (typeof name === 'string') grayedTeams.set(name, 1);
+      });
+    } else {
+      for (var teamName in state.grayed) {
+        if (state.grayed.hasOwnProperty(teamName)) {
+          var r = parseInt(state.grayed[teamName], 10);
+          grayedTeams.set(teamName, isNaN(r) ? 1 : r);
+        }
+      }
+    }
   }
 
   var teamNameToTeam = buildTeamNameToTeam(allNodes);
@@ -513,6 +529,129 @@ function buildTeamNameToElo(allNodes) {
 
 var ROUND_LABELS = ['Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Reach championship', 'Win it all'];
 
+var PROB_TABLE_COLUMNS = [
+  { key: 'r32', label: 'Round of 32', idx: 0 },
+  { key: 's16', label: 'Sweet 16', idx: 1 },
+  { key: 'e8', label: 'Elite 8', idx: 2 },
+  { key: 'f4', label: 'Final Four', idx: 3 },
+  { key: 'champ', label: 'Reach championship', idx: 4 },
+  { key: 'win', label: 'Win it all', idx: 5 },
+  { key: 'loseR32', label: 'P(win R64, lose R32)', wlnKey: 'r1' },
+  { key: 'loseS16', label: 'P(win R32, lose S16)', wlnKey: 'r2' },
+  { key: 'loseR32orS16', label: 'P(lose in R32 or S16)', wlnSum: ['r1', 'r2'] },
+  { key: 'loseE8', label: 'P(win S16, lose E8)', wlnKey: 'r3' },
+  { key: 'loseF4', label: 'P(win E8, lose F4)', wlnKey: 'r4' },
+  { key: 'loseFinal', label: 'P(win F4, lose Final)', wlnKey: 'r5' }
+];
+
+function updateProbTable(results) {
+  var wrap = document.getElementById('probTableWrap');
+  var tbody = document.getElementById('probTable') && document.getElementById('probTable').querySelector('tbody');
+  if (!wrap || !tbody) return;
+
+  if (!results || !results.reachAtLeast) {
+    wrap.classList.remove('visible');
+    return;
+  }
+
+  var allTeams = Object.keys(results.reachAtLeast);
+  var teams = allTeams.filter(function(name) {
+    var ra = results.reachAtLeast[name];
+    return ra && ra[5] > 1e-6;
+  });
+  if (teams.length === 0) {
+    wrap.classList.remove('visible');
+    return;
+  }
+
+  var sortKey = wrap.getAttribute('data-sort') || 'win';
+  var sortDir = wrap.getAttribute('data-sort-dir') || 'desc';
+
+  function getSortVal(teamName) {
+    var ra = results.reachAtLeast[teamName];
+    var wln = results.winRoundLoseNext && results.winRoundLoseNext[teamName];
+    if (!ra) return sortKey === 'team' ? teamName : 0;
+    if (sortKey === 'team') return teamName.toLowerCase();
+    var col = PROB_TABLE_COLUMNS.filter(function(c) { return c.key === sortKey; })[0];
+    if (!col) return 0;
+    if (col.wlnKey && wln) return wln[col.wlnKey] || 0;
+    if (col.wlnSum && wln) {
+      var s = 0;
+      for (var i = 0; i < col.wlnSum.length; i++) s += wln[col.wlnSum[i]] || 0;
+      return s;
+    }
+    return col.idx != null ? (ra[col.idx] || 0) : 0;
+  }
+
+  teams.sort(function(a, b) {
+    var va = getSortVal(a);
+    var vb = getSortVal(b);
+    if (typeof va === 'string') return sortDir === 'asc' ? (va < vb ? -1 : 1) : (va > vb ? -1 : 1);
+    if (sortDir === 'asc') return va - vb;
+    return vb - va;
+  });
+
+  tbody.innerHTML = '';
+  teams.forEach(function(teamName) {
+    var ra = results.reachAtLeast[teamName];
+    var tr = document.createElement('tr');
+    var teamCell = document.createElement('td');
+    teamCell.className = 'prob-team-cell';
+    var img = document.createElement('img');
+    img.className = 'team-logo';
+    img.src = LOGO_PATH + teamName + '.png';
+    img.alt = '';
+    img.onerror = function() { this.style.display = 'none'; };
+    teamCell.appendChild(img);
+    teamCell.appendChild(document.createTextNode(teamName));
+    tr.appendChild(teamCell);
+
+    PROB_TABLE_COLUMNS.forEach(function(col) {
+      var td = document.createElement('td');
+      td.className = 'num';
+      var val = null;
+      var wln = results.winRoundLoseNext && results.winRoundLoseNext[teamName];
+      if (col.wlnKey && wln) {
+        val = wln[col.wlnKey];
+      } else if (col.wlnSum && wln) {
+        val = 0;
+        for (var i = 0; i < col.wlnSum.length; i++) val += wln[col.wlnSum[i]] || 0;
+      } else if (ra && col.idx != null) {
+        val = ra[col.idx];
+      }
+      td.textContent = val != null ? Math.round(val * 100) + '%' : '—';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  var headers = document.querySelectorAll('#probTable th[data-sort]');
+  headers.forEach(function(th) {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (th.getAttribute('data-sort') === sortKey) {
+      th.classList.add('sorted-' + sortDir);
+    }
+  });
+
+  wrap.classList.add('visible');
+}
+
+function setupProbTableSorting() {
+  var wrap = document.getElementById('probTableWrap');
+  var headers = document.querySelectorAll('#probTable th[data-sort]');
+  headers.forEach(function(th) {
+    th.onclick = function() {
+      var key = th.getAttribute('data-sort');
+      var current = wrap.getAttribute('data-sort');
+      var dir = (key === current && wrap.getAttribute('data-sort-dir') === 'desc') ? 'asc' : 'desc';
+      wrap.setAttribute('data-sort', key);
+      wrap.setAttribute('data-sort-dir', dir);
+      var results = window.bracketSimResults;
+      if (results) updateProbTable(results);
+    };
+  });
+}
+
 function showSimTooltip(teamName, node, evt) {
   var tooltip = document.getElementById('simTooltip');
   if (!tooltip) return;
@@ -553,8 +692,13 @@ function hideSimTooltip() {
   if (tooltip) tooltip.classList.remove('visible');
 }
 
+function isBurnedAtRound(grayedTeams, teamName, round) {
+  var burnRound = grayedTeams.get && grayedTeams.get(teamName);
+  return burnRound != null && round >= burnRound;
+}
+
 function render(root, allNodes, container, width, height, grayedTeams, size) {
-  grayedTeams = grayedTeams || new Set();
+  grayedTeams = grayedTeams || new Map();
   size = size || 64;
   d3.select(container).selectAll('*').remove();
 
@@ -585,12 +729,12 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       if (!node) return;
       var baseFill = getCellDayColor(node) || '#fff';
       if (node.team) {
-        var isGrayed = grayedTeams.has(node.team.name);
+        var isGrayed = isBurnedAtRound(grayedTeams, node.team.name, node.round);
         g.select('rect').attr('fill', isGrayed ? '#b4b4b4' : baseFill);
       } else if (isFrontierMatchup(node, size)) {
         g.selectAll('g.frontier-logo').each(function() {
           var teamName = d3.select(this).attr('data-team');
-          var isGrayed = grayedTeams.has(teamName);
+          var isGrayed = isBurnedAtRound(grayedTeams, teamName, node.round);
           d3.select(this)
             .style('opacity', isGrayed ? '0.4' : '1')
             .style('filter', isGrayed ? 'grayscale(100%)' : 'none');
@@ -659,8 +803,8 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             .attr('data-team', t.name)
             .attr('transform', 'translate(' + x + ', 2)')
             .style('cursor', 'pointer');
-          imgWrap.style('opacity', grayedTeams.has(t.name) ? '0.4' : '1');
-          imgWrap.style('filter', grayedTeams.has(t.name) ? 'grayscale(100%)' : 'none');
+          imgWrap.style('opacity', isBurnedAtRound(grayedTeams, t.name, node.round) ? '0.4' : '1');
+          imgWrap.style('filter', isBurnedAtRound(grayedTeams, t.name, node.round) ? 'grayscale(100%)' : 'none');
           imgWrap.on('mouseenter', function() {
             showSimTooltip(t.name, node.children[slot], d3.event);
           });
@@ -728,7 +872,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       .attr('rx', 3)
       .attr('ry', 3)
       .attr('fill', function(d) {
-        if (d.team && grayedTeams.has(d.team.name)) return '#b4b4b4';
+        if (d.team && isBurnedAtRound(grayedTeams, d.team.name, d.round)) return '#b4b4b4';
         return getCellDayColor(d) || '#ffffff';
       })
       .attr('stroke', '#333')
@@ -756,7 +900,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             if (grayedTeams.has(node.team.name)) {
               grayedTeams.delete(node.team.name);
             } else {
-              grayedTeams.add(node.team.name);
+              grayedTeams.set(node.team.name, node.round);
             }
             updateGrayState();
           } else if (node.parent) {
@@ -775,7 +919,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
       .style('cursor', function(d) { return d.team ? 'pointer' : 'default'; });
 
     cells.select('rect').attr('fill', function(d) {
-      if (d.team && grayedTeams.has(d.team.name)) return '#b4b4b4';
+      if (d.team && isBurnedAtRound(grayedTeams, d.team.name, d.round)) return '#b4b4b4';
       return getCellDayColor(d) || '#fff';
     });
 
@@ -790,7 +934,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
             if (grayedTeams.has(node.team.name)) {
               grayedTeams.delete(node.team.name);
             } else {
-              grayedTeams.add(node.team.name);
+              grayedTeams.set(node.team.name, node.round);
             }
             updateGrayState();
           } else if (node.parent) {
@@ -941,7 +1085,7 @@ function main(teams, size) {
   var width = dims.width;
   var height = dims.height;
   var contentHeight = height - (size === 64 ? LEGEND_HEIGHT : 0);
-  var grayedTeams = new Set();
+  var grayedTeams = new Map(); // teamName -> round where burn starts (grayed from that round forward)
 
   var root = buildtree(teams, size);
   setParents(root, null);
@@ -1010,6 +1154,7 @@ function main(teams, size) {
           simulateStatus.textContent = result.error + ' — ' + timestamp + ' — ' + elapsedStr;
         } else {
           window.bracketSimResults = result;
+          updateProbTable(result);
           var msg = 'Done (' + (result ? result.nsims : 0) + ' sims';
           if (result && result.fromPartialState) msg += ', from current bracket';
           msg += ') — ' + timestamp + ' — ' + elapsedStr;
@@ -1032,6 +1177,8 @@ function main(teams, size) {
 }
 
 var fullTeams = null;
+
+setupProbTableSorting();
 
 queue()
   .defer(d3.json, '../bracket.json')

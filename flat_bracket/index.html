@@ -95,6 +95,43 @@
     .import-modal .import-buttons { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
     .import-modal .import-buttons button { flex: 1; min-width: 80px; }
     .import-modal .file-input-wrap { margin: 8px 0 12px 0; }
+    #probTableWrap {
+      display: none;
+      padding: 20px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      justify-content: center;
+    }
+    #probTableWrap.visible { display: flex; justify-content: center; }
+    #probTable {
+      width: auto;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    #probTable th, #probTable td {
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    #probTable th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    #probTable th:hover { background: #e2e8f0; }
+    #probTable th.sorted-asc::after { content: ' \u25b2'; font-size: 10px; color: #64748b; }
+    #probTable th.sorted-desc::after { content: ' \u25bc'; font-size: 10px; color: #64748b; }
+    #probTable td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    #probTable .prob-team-cell { display: flex; align-items: center; gap: 8px; }
+    #probTable .team-logo {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -105,9 +142,31 @@
     <button id="importBtn">Import</button>
     <button id="simulateBtn">Run 100k Simulations</button>
     <span id="simulateStatus"></span>
-    <span>Click a team to advance them. Ctrl+click to gray out all cells for that team (toggle).</span>
+    <span>Click a team to advance them. Ctrl+click to gray out that team from that round forward (toggle).</span>
   </div>
   <div id="bracket"></div>
+  <div id="probTableWrap">
+    <table id="probTable">
+      <thead>
+        <tr>
+          <th data-sort="team">Team</th>
+          <th data-sort="r32" class="num">Round of 32</th>
+          <th data-sort="s16" class="num">Sweet 16</th>
+          <th data-sort="e8" class="num">Elite 8</th>
+          <th data-sort="f4" class="num">Final Four</th>
+          <th data-sort="champ" class="num">Reach championship</th>
+          <th data-sort="win" class="num">Win it all</th>
+          <th data-sort="loseR32" class="num">P(win R64, lose R32)</th>
+          <th data-sort="loseS16" class="num">P(win R32, lose S16)</th>
+          <th data-sort="loseR32orS16" class="num">P(lose in R32 or S16)</th>
+          <th data-sort="loseE8" class="num">P(win S16, lose E8)</th>
+          <th data-sort="loseF4" class="num">P(win E8, lose F4)</th>
+          <th data-sort="loseFinal" class="num">P(win F4, lose Final)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
   <div id="simTooltip" class="sim-tooltip"></div>
 
   <div id="importModal" class="import-modal">
@@ -117,7 +176,7 @@
       <div class="file-input-wrap">
         <input type="file" id="importFileInput" accept=".json,application/json" style="font-size: 13px;">
       </div>
-      <textarea id="importPasteArea" placeholder='Paste JSON here, e.g. {"version":1,"advances":{"65":"Auburn",...},"grayed":[]}'></textarea>
+      <textarea id="importPasteArea" placeholder='Paste JSON here, e.g. {"version":1,"advances":{"65":"Auburn",...},"grayed":{"TeamA":3,"TeamB":5}}'></textarea>
       <div id="importError" class="import-error" style="display: none;"></div>
       <div class="import-buttons">
         <button id="importApplyBtn">Apply</button>
