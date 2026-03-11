@@ -122,8 +122,8 @@
       white-space: nowrap;
     }
     #probTable th:hover { background: #e2e8f0; }
-    #probTable th.sorted-asc::after { content: ' \u25b2'; font-size: 10px; color: #64748b; }
-    #probTable th.sorted-desc::after { content: ' \u25bc'; font-size: 10px; color: #64748b; }
+    #probTable th.sorted-asc::after { content: ' \2191'; font-size: 11px; color: #64748b; }
+    #probTable th.sorted-desc::after { content: ' \2193'; font-size: 11px; color: #64748b; }
     #probTable td.num { text-align: right; font-variant-numeric: tabular-nums; }
     #probTable .prob-team-cell { display: flex; align-items: center; gap: 8px; }
     #probTable .team-logo {
@@ -156,6 +156,7 @@
           <th data-sort="f4" class="num">Final Four</th>
           <th data-sort="champ" class="num">Reach championship</th>
           <th data-sort="win" class="num">Win it all</th>
+          <th data-sort="futureValue" class="num">Future value</th>
           <th data-sort="loseR32" class="num">P(win R64, lose R32)</th>
           <th data-sort="loseS16" class="num">P(win R32, lose S16)</th>
           <th data-sort="loseR32orS16" class="num">P(lose in R32 or S16)</th>

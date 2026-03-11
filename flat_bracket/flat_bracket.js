@@ -529,6 +529,14 @@ function buildTeamNameToElo(allNodes) {
 
 var ROUND_LABELS = ['Round of 32', 'Sweet 16', 'Elite 8', 'Final Four', 'Reach championship', 'Win it all'];
 
+function futureValue(ra) {
+  if (!ra) return 0;
+  var r32 = ra[0] || 0;
+  if (r32 <= 0) return 0;
+  var sum = (ra[5] || 0) + (ra[4] || 0) + (2 / 3) * (ra[3] || 0) + (1 / 5) * (ra[2] || 0);
+  return sum / r32;
+}
+
 var PROB_TABLE_COLUMNS = [
   { key: 'r32', label: 'Round of 32', idx: 0 },
   { key: 's16', label: 'Sweet 16', idx: 1 },
@@ -536,6 +544,7 @@ var PROB_TABLE_COLUMNS = [
   { key: 'f4', label: 'Final Four', idx: 3 },
   { key: 'champ', label: 'Reach championship', idx: 4 },
   { key: 'win', label: 'Win it all', idx: 5 },
+  { key: 'futureValue', label: 'Future value', fvFormula: true, rawDisplay: true },
   { key: 'loseR32', label: 'P(win R64, lose R32)', wlnKey: 'r1' },
   { key: 'loseS16', label: 'P(win R32, lose S16)', wlnKey: 'r2' },
   { key: 'loseR32orS16', label: 'P(lose in R32 or S16)', wlnSum: ['r1', 'r2'] },
@@ -580,6 +589,7 @@ function updateProbTable(results) {
       for (var i = 0; i < col.wlnSum.length; i++) s += wln[col.wlnSum[i]] || 0;
       return s;
     }
+    if (col.fvFormula && ra) return futureValue(ra);
     return col.idx != null ? (ra[col.idx] || 0) : 0;
   }
 
@@ -616,10 +626,12 @@ function updateProbTable(results) {
       } else if (col.wlnSum && wln) {
         val = 0;
         for (var i = 0; i < col.wlnSum.length; i++) val += wln[col.wlnSum[i]] || 0;
+      } else if (col.fvFormula && ra) {
+        val = futureValue(ra);
       } else if (ra && col.idx != null) {
         val = ra[col.idx];
       }
-      td.textContent = val != null ? Math.round(val * 100) + '%' : '—';
+      td.textContent = val != null ? (col.rawDisplay ? val.toFixed(3) : Math.round(val * 100) + '%') : '—';
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
