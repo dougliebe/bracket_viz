@@ -1,266 +1,266 @@
 {
   "south": {
     "1": {
-      "name": "Auburn",
-      "elo": 2140.16
+      "name": "Florida",
+      "elo": 3298.11
     },
     "16": {
-      "name": "Alabama St",
-      "elo": 1346.38
+      "name": "Lehigh",
+      "elo": 626.7
     },
     "8": {
-      "name": "Louisville",
-      "elo": 1948.82
+      "name": "Clemson",
+      "elo": 2521.07
     },
     "9": {
-      "name": "Creighton",
-      "elo": 1898.64
+      "name": "Iowa",
+      "elo": 2453.39
     },
     "5": {
-      "name": "Michigan",
-      "elo": 1927.27
+      "name": "Vanderbilt",
+      "elo": 2601.16
     },
     "12": {
-      "name": "UC San Diego",
-      "elo": 1861.73
+      "name": "McNeese St",
+      "elo": 1721.59
     },
     "4": {
-      "name": "Texas A&M",
-      "elo": 1945.56
+      "name": "Nebraska",
+      "elo": 2748.56
     },
     "13": {
-      "name": "Yale",
-      "elo": 1772.81
+      "name": "Troy",
+      "elo": 1398.54
     },
     "6": {
-      "name": "Mississippi",
-      "elo": 1912.14
+      "name": "North Carolina",
+      "elo": 2695.42
     },
     "11": {
-      "name": "North Carolina",
-      "elo": 1888.27
+      "name": "VCU",
+      "elo": 2317.67
     },
     "3": {
-      "name": "Iowa St",
-      "elo": 2066.53
+      "name": "Illinois",
+      "elo": 2838.11
     },
     "14": {
-      "name": "Lipscomb",
-      "elo": 1640.51
+      "name": "Penn",
+      "elo": 1243.09
     },
     "7": {
-      "name": "Marquette",
-      "elo": 1983.05
+      "name": "St Mary's CA",
+      "elo": 2798.81
     },
     "10": {
-      "name": "New Mexico",
-      "elo": 1897.74
+      "name": "Texas A&M",
+      "elo": 2458.82
     },
     "2": {
-      "name": "Michigan St",
-      "elo": 2053.01
+      "name": "Houston",
+      "elo": 3268.72
     },
     "15": {
-      "name": "Bryant",
-      "elo": 1612.34
+      "name": "Idaho",
+      "elo": 755.24
     }
   },
   "west": {
     "1": {
-      "name": "Florida",
-      "elo": 2128.93
+      "name": "Arizona",
+      "elo": 3325.67
     },
     "16": {
-      "name": "Norfolk St",
-      "elo": 1555.46
+      "name": "LIU Brooklyn",
+      "elo": 954.32
     },
     "8": {
-      "name": "Connecticut",
-      "elo": 2048.05
+      "name": "Villanova",
+      "elo": 2632.53
     },
     "9": {
-      "name": "Oklahoma",
-      "elo": 1862.64
+      "name": "Utah St",
+      "elo": 2537.27
     },
     "5": {
-      "name": "Memphis",
-      "elo": 1871.5
+      "name": "Wisconsin",
+      "elo": 2686.35
     },
     "12": {
-      "name": "Colorado St",
-      "elo": 1882.39
+      "name": "High Point",
+      "elo": 1743.92
     },
     "4": {
-      "name": "Maryland",
-      "elo": 2002.06
+      "name": "Arkansas",
+      "elo": 2785.35
     },
     "13": {
-      "name": "Grand Canyon",
-      "elo": 1723.73
+      "name": "Hawaii",
+      "elo": 1447.9
     },
     "6": {
-      "name": "Missouri",
-      "elo": 1904.58
+      "name": "BYU",
+      "elo": 2648.83
     },
     "11": {
-      "name": "Drake",
-      "elo": 1869.47
+      "name": "NC State",
+      "elo": 2200.75
     },
     "3": {
-      "name": "Texas Tech",
-      "elo": 1991.73
+      "name": "Gonzaga",
+      "elo": 2974.24
     },
     "14": {
-      "name": "UNC Wilmington",
-      "elo": 1653.7
+      "name": "Kennesaw",
+      "elo": 1385.52
     },
     "7": {
-      "name": "Kansas",
-      "elo": 1966.78
+      "name": "Miami FL",
+      "elo": 2250.22
     },
     "10": {
-      "name": "Arkansas",
-      "elo": 1801.02
+      "name": "Missouri",
+      "elo": 2526.97
     },
     "2": {
-      "name": "St John's",
-      "elo": 2057.69
+      "name": "Purdue",
+      "elo": 2840.41
     },
     "15": {
-      "name": "NE Omaha",
-      "elo": 1579.04
+      "name": "Queens NC",
+      "elo": 1050.21
     }
   },
   "midwest": {
     "1": {
-      "name": "Houston",
-      "elo": 2123.22
+      "name": "Michigan",
+      "elo": 3321.33
     },
     "16": {
-      "name": "SIUE",
-      "elo": 1458.34
+      "name": "Howard",
+      "elo": 632.49
     },
     "8": {
-      "name": "Gonzaga",
-      "elo": 1955.0
+      "name": "Georgia",
+      "elo": 2450.43
     },
     "9": {
-      "name": "Georgia",
-      "elo": 1843.96
+      "name": "St Louis",
+      "elo": 2243.71
     },
     "5": {
-      "name": "Clemson",
-      "elo": 1957.48
+      "name": "Texas Tech",
+      "elo": 3019.31
     },
     "12": {
-      "name": "McNeese St",
-      "elo": 1682.99
+      "name": "Akron",
+      "elo": 2026.92
     },
     "4": {
-      "name": "Purdue",
-      "elo": 1997.58
+      "name": "Alabama",
+      "elo": 3136.05
     },
     "13": {
-      "name": "High Point",
-      "elo": 1717.53
+      "name": "Hofstra",
+      "elo": 1358.1
     },
     "6": {
-      "name": "Illinois",
-      "elo": 2005.78
+      "name": "Tennessee",
+      "elo": 2866.93
     },
     "11": {
-      "name": "Xavier",
-      "elo": 1840.35
+      "name": "Miami OH",
+      "elo": 2030.79
     },
     "3": {
-      "name": "Kentucky",
-      "elo": 1876.14
+      "name": "Virginia",
+      "elo": 2673.2
     },
     "14": {
-      "name": "Troy",
-      "elo": 1651.78
+      "name": "Wright St",
+      "elo": 1234.19
     },
     "7": {
-      "name": "UCLA",
-      "elo": 1846.37
+      "name": "Kentucky",
+      "elo": 2725.09
     },
     "10": {
-      "name": "Utah St",
-      "elo": 1890.38
+      "name": "Santa Clara",
+      "elo": 2267.23
     },
     "2": {
-      "name": "Tennessee",
-      "elo": 2030.56
+      "name": "Iowa St",
+      "elo": 2921.55
     },
     "15": {
-      "name": "Wofford",
-      "elo": 1603.47
+      "name": "Tennessee St",
+      "elo": 998.05
     }
   },
   "east": {
     "1": {
       "name": "Duke",
-      "elo": 2105.55
+      "elo": 3453.35
     },
     "16": {
-      "name": "Mt St Mary's",
-      "elo": 1475.66
+      "name": "Siena",
+      "elo": 1038.35
     },
     "8": {
-      "name": "Mississippi St",
-      "elo": 1955.9
+      "name": "Ohio St",
+      "elo": 2457.3
     },
     "9": {
-      "name": "Baylor",
-      "elo": 1887.53
+      "name": "TCU",
+      "elo": 2414.85
     },
     "5": {
-      "name": "Oregon",
-      "elo": 1912.8
+      "name": "St John's",
+      "elo": 3108.05
     },
     "12": {
-      "name": "Liberty",
-      "elo": 1784.57
+      "name": "Northern Iowa",
+      "elo": 1580.66
     },
     "4": {
-      "name": "Arizona",
-      "elo": 1971.82
+      "name": "Kansas",
+      "elo": 2880.03
     },
     "13": {
-      "name": "Akron",
-      "elo": 1642.84
+      "name": "Cal Baptist",
+      "elo": 1505.79
     },
     "6": {
-      "name": "BYU",
-      "elo": 1931.68
+      "name": "Louisville",
+      "elo": 2506.37
     },
     "11": {
-      "name": "VCU",
-      "elo": 1888.8
+      "name": "South Florida",
+      "elo": 2002.43
     },
     "3": {
-      "name": "Wisconsin",
-      "elo": 2009.37
+      "name": "Michigan St",
+      "elo": 3120.18
     },
     "14": {
-      "name": "Montana",
-      "elo": 1583.39
+      "name": "N Dakota St",
+      "elo": 1483.32
     },
     "7": {
-      "name": "St Mary's CA",
-      "elo": 1944.8
+      "name": "UCLA",
+      "elo": 2527.73
     },
     "10": {
-      "name": "Vanderbilt",
-      "elo": 1791.19
+      "name": "UCF",
+      "elo": 2430.78
     },
     "2": {
-      "name": "Alabama",
-      "elo": 2058.67
+      "name": "Connecticut",
+      "elo": 3221.43
     },
     "15": {
-      "name": "Robert Morris",
-      "elo": 1611.8
+      "name": "Furman",
+      "elo": 1134.0
     }
   }
 }

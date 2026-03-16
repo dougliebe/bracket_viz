@@ -1,5 +1,5 @@
 /**
- * Flat bracket visualization - South above West on left, East above Midwest on right.
+ * Flat bracket visualization - East top-left, South bottom-left, West top-right, Midwest bottom-right.
  * Click teams to advance them. Reuses logos and team logic from radial bracket.
  */
 
@@ -12,7 +12,7 @@ function eloWinProb(eloA, eloB) {
   if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return null;
   if (eloB === 0) return 1;
   if (eloA === 0) return 0;
-  return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
+  return 1 / (1 + Math.pow(10, (eloB - eloA) / 1200));
 }
 
 function indexToLetter(index) {
@@ -76,23 +76,24 @@ function getGameDay(gid, round, size, node) {
   if (round === 1) {
     /* Each R64 game has 2 gids (2 team slots). Both must return same day. Use gameIdx = floor((gid - base) / 2). */
     var reg = regionFromGid(gid);
+    /* 2026 R64: order East(1-8), South(9-16), Midwest(17-24), West(25-32) */
     if (reg === 'east') {
       var gameIdx = Math.floor((gid - 49) / 2);
       var eastBracketGame = [8, 7, 6, 4, 3, 5, 2, 1];
       var bracketGame = eastBracketGame[gameIdx];
-      var eastDayByBracket = { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 1, 7: 1, 8: 2 };
+      var eastDayByBracket = { 1: 1, 2: 1, 3: 2, 4: 1, 5: 2, 6: 1, 7: 2, 8: 2 };
       return eastDayByBracket[bracketGame] === 1 ? 'day1' : 'day2';
     }
     if (reg === 'midwest') {
       var gameIdx = Math.floor((gid - 33) / 2);
       var mwBracketGame = [8, 7, 6, 4, 3, 5, 2, 1];
       var bracketGame = mwBracketGame[gameIdx];
-      var mwDayByBracket = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 2, 7: 2, 8: 1 };
+      var mwDayByBracket = { 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2 };
       return mwDayByBracket[bracketGame] === 1 ? 'day1' : 'day2';
     }
     var rSlot = flatToRslot(gid);
     var gameIdx = Math.floor((rSlot - 1) / 2);
-    var r64 = [2,2,2,2,1,1,2,2,1,1,1,1,2,2,1,1, 1,1,1,1,2,2,2,2,2,2,2,2,1,1,1,1];
+    var r64 = [1,1,2,1,1,2,2,2, 1,1,2,2,2,2,2,2, 2,2,1,1,1,1,1,1, 2,2,1,1,1,1,2,2];
     return r64[gameIdx] === 1 ? 'day1' : 'day2';
   }
   if (round === 2) {
@@ -103,14 +104,16 @@ function getGameDay(gid, round, size, node) {
         return getGameDay(c0.gid, 1, size);
       }
     }
-    var r32 = [4,4,3,4,3,3,4,3,3,3,4,4,4,4,3,3];
+    /* 2026 R32: order East(1-4), South(5-8), Midwest(9-12), West(13-16); code gids: South 65-72, West 73-80, MW 81-88, East 89-96 */
+    var r32 = [4, 3, 3, 3, 4, 3, 3, 4, 3, 4, 4, 4, 3, 4, 3, 4];
     var gameIdx = gid - 65;
     return r32[Math.floor(gameIdx / 2)] === 3 ? 'day1' : 'day2';
   }
   if (round === 3) {
+    /* 2026 S16: East/South 1,2 day2; South 3,4 and MW 5,6 day1; West day2 */
     var reg = regionFromGid(gid);
     if (!reg) return null;
-    var dayByRegion = { south: 'day2', west: 'day1', midwest: 'day2', east: 'day1' };
+    var dayByRegion = { south: 'day1', west: 'day1', midwest: 'day2', east: 'day2' };
     return dayByRegion[reg] || null;
   }
   return null;
@@ -148,8 +151,8 @@ function buildtree(teams, size) {
     if ((gid >= 49 && gid <= 64) || (gid >= 89 && gid <= 96) ||
         (gid >= 109 && gid <= 112) ||
         (gid == 119 || gid == 120 || gid == 124)) return 'east';
-    if (gid == 125) return 'south-west';
-    if (gid == 126) return 'east-midwest';
+    if (gid == 125) return 'east-south';
+    if (gid == 126) return 'west-midwest';
     if (gid == 127) return 'south-west-east-midwest';
     throw new Error('undefined region for gid ' + gid);
   }
@@ -167,6 +170,23 @@ function buildtree(teams, size) {
       roundgames[round].push(right);
     }
     round--;
+  }
+
+  /* 2026 Final Four: left semi = East vs South, right semi = West vs Midwest.
+   * Default build gives 125=South-West, 126=East-Midwest. Swap children to fix. */
+  if (size === 64 && roundgames[6] && roundgames[5]) {
+    var n125 = roundgames[6].filter(function(n) { return n.gid === 125; })[0];
+    var n126 = roundgames[6].filter(function(n) { return n.gid === 126; })[0];
+    var n121 = roundgames[5].filter(function(n) { return n.gid === 121; })[0];
+    var n122 = roundgames[5].filter(function(n) { return n.gid === 122; })[0];
+    var n123 = roundgames[5].filter(function(n) { return n.gid === 123; })[0];
+    var n124 = roundgames[5].filter(function(n) { return n.gid === 124; })[0];
+    if (n121 && n122 && n123 && n124 && n125 && n126) {
+      n125.children = [n124, n121];
+      n126.children = [n122, n123];
+      n125.region = 'east-south';
+      n126.region = 'west-midwest';
+    }
   }
 
   function normalizeTeam(t) {
@@ -227,10 +247,13 @@ function collectNodes(root) {
   return nodes;
 }
 
+/* Left = East + South, Right = West + Midwest */
 function isLeftSide(gid) {
-  var r = (gid >= 1 && gid <= 16) || (gid >= 17 && gid <= 32) ||
-          (gid >= 65 && gid <= 80) || (gid >= 97 && gid <= 104) ||
-          (gid >= 113 && gid <= 116) || (gid >= 121 && gid <= 122) || gid == 125;
+  var r = (gid >= 1 && gid <= 16) || (gid >= 49 && gid <= 64) ||
+          (gid >= 65 && gid <= 72) || (gid >= 89 && gid <= 96) ||
+          (gid >= 97 && gid <= 100) || (gid >= 109 && gid <= 112) ||
+          (gid >= 113 && gid <= 114) || (gid >= 119 && gid <= 120) ||
+          gid === 121 || gid === 124 || gid === 125;
   return r;
 }
 
@@ -240,10 +263,11 @@ function computePositions(root, width, height) {
   var leftEdge = pad + 80;
   var rightEdge = width - pad - 80;
 
+  /* East top-left, South bottom-left, West top-right, Midwest bottom-right */
   var regionBands = {
-    south: { y0: 0.03, y1: 0.47 },
-    west: { y0: 0.53, y1: 0.97 },
     east: { y0: 0.03, y1: 0.47 },
+    south: { y0: 0.53, y1: 0.97 },
+    west: { y0: 0.03, y1: 0.47 },
     midwest: { y0: 0.53, y1: 0.97 }
   };
 
@@ -271,17 +295,17 @@ function computePositions(root, width, height) {
   leafGamesByRegion.east.sort(function(a, b) { return a.gid - b.gid; });
   leafGamesByRegion.midwest.sort(function(a, b) { return a.gid - b.gid; });
 
+  leafGamesByRegion.east.forEach(function(g, i) {
+    g.px = roundToX(1, true);
+    g.py = slotToY(15 - i, 16, regionBands.east.y0, regionBands.east.y1);
+  });
   leafGamesByRegion.south.forEach(function(g, i) {
     g.px = roundToX(1, true);
     g.py = slotToY(i, 16, regionBands.south.y0, regionBands.south.y1);
   });
   leafGamesByRegion.west.forEach(function(g, i) {
-    g.px = roundToX(1, true);
-    g.py = slotToY(i, 16, regionBands.west.y0, regionBands.west.y1);
-  });
-  leafGamesByRegion.east.forEach(function(g, i) {
     g.px = roundToX(1, false);
-    g.py = slotToY(15 - i, 16, regionBands.east.y0, regionBands.east.y1);
+    g.py = slotToY(i, 16, regionBands.west.y0, regionBands.west.y1);
   });
   leafGamesByRegion.midwest.forEach(function(g, i) {
     g.px = roundToX(1, false);
@@ -994,9 +1018,9 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
     var rightEdge = width - 12 - 80;
     var labelOffset = CELL_WIDTH / 2 + 25;
     var labelData = [
-      { text: 'South', x: 14, y: height * 0.25, rot: -90 },
-      { text: 'West', x: 14, y: height * 0.75, rot: -90 },
-      { text: 'East', x: rightEdge + labelOffset, y: height * 0.25, rot: 90 },
+      { text: 'East', x: 14, y: height * 0.25, rot: -90 },
+      { text: 'South', x: 14, y: height * 0.75, rot: -90 },
+      { text: 'West', x: rightEdge + labelOffset, y: height * 0.25, rot: 90 },
       { text: 'Midwest', x: rightEdge + labelOffset, y: height * 0.75, rot: 90 }
     ];
     labelsGroup.selectAll('text.region').data(labelData).enter()

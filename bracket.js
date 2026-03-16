@@ -11,7 +11,7 @@ function eloWinProb(eloA, eloB) {
   if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return null;
   if (eloB === 0) return 1;
   if (eloA === 0) return 0;
-  return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
+  return 1 / (1 + Math.pow(10, (eloB - eloA) / 1200));
 }
 
 function indexToLetter(index) {

@@ -10,7 +10,7 @@ var N_ROUNDS = 6;
 
 function eloWinProb(eloA, eloB) {
   if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return 0.5;
-  return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
+  return 1 / (1 + Math.pow(10, (eloB - eloA) / 1200));
 }
 
 /** xorshift32 - fast seeded RNG */

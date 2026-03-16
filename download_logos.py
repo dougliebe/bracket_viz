@@ -145,7 +145,11 @@ def main():
         if bracket_path.exists():
             data = json.loads(bracket_path.read_text(encoding="utf-8"))
             for region_teams in data.values():
-                teams.extend(region_teams.values())
+                for slot in region_teams.values():
+                    if isinstance(slot, dict) and "name" in slot:
+                        teams.append(slot["name"])
+                    elif isinstance(slot, str):
+                        teams.append(slot)
         else:
             print(f"bracket.json not found: {bracket_path}")
             return 1
@@ -157,8 +161,9 @@ def main():
     LOGO_DIR.mkdir(parents=True, exist_ok=True)
     ok, fail = 0, 0
 
-    for name in teams:
-        name = name.strip()
+    for raw in teams:
+        name = raw["name"] if isinstance(raw, dict) and "name" in raw else raw
+        name = (name or "").strip() if isinstance(name, str) else ""
         if not name:
             continue
         if download_logo(name):

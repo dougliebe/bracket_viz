@@ -25,7 +25,7 @@ SEED_ORDER = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15]
 REGION_ORDER = ["W", "X", "Y", "Z"]
 
 # Flat bracket region mapping: CSV order is East(W), Midwest(X), South(Y), West(Z)
-NCAA_TO_FLAT = {"W": "east", "X": "midwest", "Y": "south", "Z": "west"}
+NCAA_TO_FLAT = {"W": "east", "X": "south", "Y": "midwest", "Z": "west"}
 
 
 def load_csv(path):
@@ -49,7 +49,7 @@ def main():
     SPELLINGS_CSV = data_dir / "MTeamSpellings.csv"
     ELO_CSV = data_dir / "data-KjK2N.csv"
 
-    season = 2025
+    season = 2026
 
     # Load seeds for 2025
     seeds = load_csv(SEEDS_CSV)
@@ -98,7 +98,7 @@ def main():
         team_lower = team_raw.strip().lower()
         current = parse_elo(r.get(current_elo_key, r.get("Current Elo", 0)))
         season_max = parse_elo(r.get(season_max_key, r.get("Season Max.", 0)))
-        elo_val = season_max if season_max > 0 else current
+        elo_val = current if current > 0 else season_max
         elo_by_team[team_lower] = {"row_id": row_id, "team_raw": team_raw, "elo": elo_val}
 
     # Build TeamID -> elo row_id (for play-in filter) and TeamID -> elo value

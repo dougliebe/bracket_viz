@@ -60,18 +60,43 @@ GID pairs map to bracket games in reverse order:
 | 6       | 61, 62  | Game 2 (8v9) |
 | 7       | 63, 64  | Game 1 (1v16)|
 
-## Day Assignments by Region
+## Day Assignments by Region (2026)
 
-### East
-- **Day 2 (blue):** Games 1, 2, 3, 4, 5, 8 (1v16, 8v9, 5v12, 4v13, 6v11, 2v15)
-- **Day 1 (yellow):** Games 6, 7 (3v14, 7v10)
+Game indices follow East, South, Midwest, West order (1–8 per region).
 
-### Midwest (reversed from East)
-- **Day 1 (yellow):** Games 1, 2, 3, 4, 5, 8
-- **Day 2 (blue):** Games 6, 7 (3v14, 7v10)
+### R64 (32 games)
+```r
+B64_R64_DAY1_GAMES <- c(1L, 2L, 5L, 6L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 27L, 28L, 29L, 30L)
+B64_R64_DAY2_GAMES <- c(3L, 4L, 7L, 8L, 9L, 10L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L, 31L, 32L)
+```
 
-### South & West
-Use the existing `r64` array with `flatToRslot`; user confirmed these are correct.
+### East (games 1–8)
+- **Day 1 (yellow):** Games 1, 2, 5, 6
+- **Day 2 (blue):** Games 3, 4, 7, 8
+
+### South (games 9–16)
+- **Day 1 (yellow):** Games 11, 12, 13, 14, 15, 16
+- **Day 2 (blue):** Games 9, 10
+
+### Midwest (games 17–24)
+- **Day 1 (yellow):** Games 17, 18
+- **Day 2 (blue):** Games 19, 20, 21, 22, 23, 24
+
+### West (games 25–32)
+- **Day 1 (yellow):** Games 27, 28, 29, 30
+- **Day 2 (blue):** Games 25, 26, 31, 32
+
+### R32 (16 games)
+```r
+B64_R32_DAY1_GAMES <- c(1L, 3L, 6L, 7L, 8L, 9L, 14L, 15L)
+B64_R32_DAY2_GAMES <- c(4L, 2L, 5L, 10L, 11L, 12L, 13L, 16L)
+```
+
+### S16 (8 games)
+```r
+B64_S16_DAY1_GAMES <- c(3L, 4L, 5L, 6L)  # South, Midwest
+B64_S16_DAY2_GAMES <- c(1L, 2L, 7L, 8L)  # East, West
+```
 
 ## R32 Inheritance
 
@@ -82,5 +107,5 @@ R32 games inherit their day from the R64 games that feed into them. If both R64 
 1. **Round 1:** Compute `gameIdx = floor((gid - base) / 2)` so both slots in a game share the same index.
 2. **East/Midwest:** Map `gameIdx` → bracket game → day via region-specific lookup.
 3. **South/West:** Use `flatToRslot` + `r64` array.
-4. **Round 2:** Derive day from R64 children when the node is available.
-5. **Round 3:** Use fixed day-by-region (South/West day 1, East/Midwest day 2 for Sweet 16).
+4. **Round 2:** Derive day from R64 children when the node is available; fallback to `r32` array.
+5. **Round 3:** Use fixed day-by-region (South/Midwest day 1, East/West day 2 for 2026 Sweet 16).
