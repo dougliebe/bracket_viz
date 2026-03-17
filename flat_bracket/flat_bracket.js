@@ -672,6 +672,42 @@ function updateProbTable(results) {
   wrap.classList.add('visible');
 }
 
+function setupCopyTableCsv() {
+  var btn = document.getElementById('copyTableCsvBtn');
+  if (!btn) return;
+  btn.onclick = function() {
+    var table = document.getElementById('probTable');
+    if (!table) return;
+    var rows = [];
+    var ths = table.querySelectorAll('thead th');
+    if (ths.length) {
+      var headerCells = [];
+      for (var i = 0; i < ths.length; i++) headerCells.push(escapeCsv(ths[i].textContent.trim()));
+      rows.push(headerCells.join(','));
+    }
+    var trs = table.querySelectorAll('tbody tr');
+    for (var r = 0; r < trs.length; r++) {
+      var tds = trs[r].querySelectorAll('td');
+      var cells = [];
+      for (var c = 0; c < tds.length; c++) cells.push(escapeCsv(tds[c].textContent.trim()));
+      rows.push(cells.join(','));
+    }
+    var csv = rows.join('\r\n');
+    navigator.clipboard.writeText(csv).then(function() {
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = 'Copy as CSV'; }, 2000);
+    }).catch(function() {
+      btn.textContent = 'Copy failed';
+      setTimeout(function() { btn.textContent = 'Copy as CSV'; }, 2000);
+    });
+  };
+  function escapeCsv(str) {
+    if (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0)
+      return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+}
+
 function setupProbTableSorting() {
   var wrap = document.getElementById('probTableWrap');
   var headers = document.querySelectorAll('#probTable th[data-sort]');
@@ -1215,6 +1251,7 @@ function main(teams, size) {
 var fullTeams = null;
 
 setupProbTableSorting();
+setupCopyTableCsv();
 
 queue()
   .defer(d3.json, '../bracket.json')
