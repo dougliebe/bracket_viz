@@ -108,7 +108,7 @@
     },
     "3": {
       "name": "Gonzaga",
-      "elo": 3021.08
+      "elo": 2900.0
     },
     "14": {
       "name": "Kennesaw",
@@ -158,7 +158,7 @@
     },
     "4": {
       "name": "Alabama",
-      "elo": 2891.75
+      "elo": 2770.0
     },
     "13": {
       "name": "Hofstra",
@@ -200,7 +200,7 @@
   "east": {
     "1": {
       "name": "Duke",
-      "elo": 3589.76
+      "elo": 3500.0
     },
     "16": {
       "name": "Siena",
@@ -256,7 +256,7 @@
     },
     "2": {
       "name": "Connecticut",
-      "elo": 3061.83
+      "elo": 2961.0
     },
     "15": {
       "name": "Furman",
