@@ -18,7 +18,7 @@ from pathlib import Path
 # Default data dir (used when NCAA_DATA_DIR and --data-dir are not set)
 _DEFAULT_DATA_DIR = "D:/ANALYTICS/ncaa/data"
 # Play-in losers to exclude (elo row IDs from data-KjK2N.csv)
-EXCLUDE_ELO_IDS = {208, 55, 43, 282}
+EXCLUDE_ELO_IDS = {291, 124, 51, 296}
 
 # NCAA bracket order: regions W,X,Y,Z; seeds 1,16,8,9,5,12,4,13,6,11,3,14,7,10,2,15
 SEED_ORDER = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15]
