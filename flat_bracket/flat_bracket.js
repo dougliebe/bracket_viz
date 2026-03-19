@@ -557,7 +557,8 @@ function futureValue(ra) {
   if (!ra) return 0;
   var r32 = ra[0] || 0;
   if (r32 <= 0) return 0;
-  var sum = (ra[5] || 0) + (ra[4] || 0) + (2 / 3) * (ra[3] || 0) + (1 / 5) * (ra[2] || 0);
+  var pNC = ra[4] || 0, pF4 = ra[3] || 0, pE8 = ra[2] || 0;
+  var sum = pNC + (pF4 - pNC) * (2 / 3) + (pE8 - pF4) * (1 / 4.5);
   return sum / r32;
 }
 
