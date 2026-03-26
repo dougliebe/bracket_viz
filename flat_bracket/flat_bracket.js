@@ -8,6 +8,10 @@ var LOGO_SIZE = 20;   /* 1.5x smaller: 30 / 1.5 */
 var CELL_WIDTH = 94;  /* 1.5x smaller: 140 / 1.5 */
 var CELL_HEIGHT = 24; /* 1.5x smaller: 36 / 1.5 */
 
+function isCompactS16Layout(size) {
+  return size === 16 && typeof window !== 'undefined' && window.FLAT_BRACKET_COMPACT;
+}
+
 function eloWinProb(eloA, eloB) {
   if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return null;
   if (eloB === 0) return 1;
@@ -33,6 +37,11 @@ var SIZE_CONFIG = {
   8: { startRound: 4, leafGids: [113, 120] },
   4: { startRound: 5, leafGids: [121, 124] }
 };
+
+function getLeafRound(size) {
+  var c = SIZE_CONFIG[size] || SIZE_CONFIG[64];
+  return c.startRound;
+}
 
 var r_to_l = ['1', '16', '8', '9', '5', '12', '4', '13',
               '6', '11', '3', '14', '7', '10', '2', '15'];
@@ -174,7 +183,7 @@ function buildtree(teams, size) {
 
   /* 2026 Final Four: left semi = East vs South, right semi = West vs Midwest.
    * Default build gives 125=South-West, 126=East-Midwest. Swap children to fix. */
-  if (size === 64 && roundgames[6] && roundgames[5]) {
+  if (roundgames[6] && roundgames[5]) {
     var n125 = roundgames[6].filter(function(n) { return n.gid === 125; })[0];
     var n126 = roundgames[6].filter(function(n) { return n.gid === 126; })[0];
     var n121 = roundgames[5].filter(function(n) { return n.gid === 121; })[0];
@@ -257,14 +266,25 @@ function isLeftSide(gid) {
   return r;
 }
 
-function computePositions(root, width, height) {
-  var pad = 12;
+function computePositions(root, width, height, size) {
+  size = size || 64;
+  var startRound = getLeafRound(size);
+  var slotsPerRegion = size / 4;
+  var compactS16 = isCompactS16Layout(size);
+  /* Tighter canvas margins only; cell sizes stay at CELL_WIDTH × CELL_HEIGHT. */
+  var pad = compactS16 ? 8 : 12;
+  var edgeInset = compactS16 ? 48 : 80;
   var centerX = width / 2;
-  var leftEdge = pad + 80;
-  var rightEdge = width - pad - 80;
+  var leftEdge = pad + edgeInset;
+  var rightEdge = width - pad - edgeInset;
 
   /* East top-left, South bottom-left, West top-right, Midwest bottom-right */
-  var regionBands = {
+  var regionBands = compactS16 ? {
+    east: { y0: 0.03, y1: 0.47 },
+    south: { y0: 0.52, y1: 0.97 },
+    west: { y0: 0.03, y1: 0.47 },
+    midwest: { y0: 0.52, y1: 0.97 }
+  } : {
     east: { y0: 0.03, y1: 0.47 },
     south: { y0: 0.53, y1: 0.97 },
     west: { y0: 0.03, y1: 0.47 },
@@ -272,9 +292,10 @@ function computePositions(root, width, height) {
   };
 
   function roundToX(round, left) {
-    if (round === 1) return left ? leftEdge : rightEdge;
+    if (round === startRound) return left ? leftEdge : rightEdge;
     if (round === 7) return centerX;
-    var t = (round - 1) / 6;
+    var span = 7 - startRound;
+    var t = span > 0 ? (round - startRound) / span : 0;
     return left ? leftEdge + t * (centerX - leftEdge) : rightEdge - t * (rightEdge - centerX);
   }
 
@@ -284,7 +305,7 @@ function computePositions(root, width, height) {
   }
 
   var leafGamesByRegion = { south: [], west: [], east: [], midwest: [] };
-  var leafGames = collectNodes(root).filter(function(n) { return n.round === 1; });
+  var leafGames = collectNodes(root).filter(function(n) { return n.round === startRound; });
   leafGames.forEach(function(g) {
     var r = g.region;
     if (leafGamesByRegion[r]) leafGamesByRegion[r].push(g);
@@ -296,20 +317,20 @@ function computePositions(root, width, height) {
   leafGamesByRegion.midwest.sort(function(a, b) { return a.gid - b.gid; });
 
   leafGamesByRegion.east.forEach(function(g, i) {
-    g.px = roundToX(1, true);
-    g.py = slotToY(15 - i, 16, regionBands.east.y0, regionBands.east.y1);
+    g.px = roundToX(startRound, true);
+    g.py = slotToY(slotsPerRegion - 1 - i, slotsPerRegion, regionBands.east.y0, regionBands.east.y1);
   });
   leafGamesByRegion.south.forEach(function(g, i) {
-    g.px = roundToX(1, true);
-    g.py = slotToY(i, 16, regionBands.south.y0, regionBands.south.y1);
+    g.px = roundToX(startRound, true);
+    g.py = slotToY(i, slotsPerRegion, regionBands.south.y0, regionBands.south.y1);
   });
   leafGamesByRegion.west.forEach(function(g, i) {
-    g.px = roundToX(1, false);
-    g.py = slotToY(i, 16, regionBands.west.y0, regionBands.west.y1);
+    g.px = roundToX(startRound, false);
+    g.py = slotToY(i, slotsPerRegion, regionBands.west.y0, regionBands.west.y1);
   });
   leafGamesByRegion.midwest.forEach(function(g, i) {
-    g.px = roundToX(1, false);
-    g.py = slotToY(15 - i, 16, regionBands.midwest.y0, regionBands.midwest.y1);
+    g.px = roundToX(startRound, false);
+    g.py = slotToY(slotsPerRegion - 1 - i, slotsPerRegion, regionBands.midwest.y0, regionBands.midwest.y1);
   });
 
   var nodesByRound = {};
@@ -409,6 +430,114 @@ function loadTeams(data) {
   return teams;
 }
 
+function normalizeBracketTeamKey(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name.toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+}
+
+var S16_NAME_ALIASES = {
+  uconn: 'Connecticut',
+  'u conn': 'Connecticut',
+  'st johns': "St John's",
+  "st john's": "St John's",
+  'michigan st': 'Michigan St',
+  'michigan state': 'Michigan St',
+  'iowa st': 'Iowa St',
+  'iowa state': 'Iowa St'
+};
+
+function buildBracketTeamLookup(bracketData) {
+  var byNorm = {};
+  var byCanon = {};
+  if (!bracketData || typeof bracketData !== 'object') return { byNorm: byNorm, byCanon: byCanon };
+  var regions = ['south', 'west', 'midwest', 'east'];
+  for (var r = 0; r < regions.length; r++) {
+    var reg = regions[r];
+    var obj = bracketData[reg];
+    if (!obj || typeof obj !== 'object') continue;
+    for (var k in obj) {
+      if (!obj.hasOwnProperty(k)) continue;
+      var entry = obj[k];
+      if (typeof entry === 'object' && entry && entry.name) {
+        var nm = entry.name;
+        var t = { name: nm, elo: entry.elo != null && Number.isFinite(entry.elo) ? entry.elo : 1500 };
+        byNorm[normalizeBracketTeamKey(nm)] = t;
+        byCanon[nm] = t;
+      }
+    }
+  }
+  return { byNorm: byNorm, byCanon: byCanon };
+}
+
+function resolveTeamFromBracket(name, lookup) {
+  var norm = normalizeBracketTeamKey(name);
+  if (S16_NAME_ALIASES[norm]) {
+    var aliasTarget = S16_NAME_ALIASES[norm];
+    var aliasNorm = normalizeBracketTeamKey(aliasTarget);
+    if (lookup.byNorm[aliasNorm]) return lookup.byNorm[aliasNorm];
+    if (lookup.byCanon[aliasTarget]) return lookup.byCanon[aliasTarget];
+  }
+  if (lookup.byNorm[norm]) return lookup.byNorm[norm];
+  for (var k in lookup.byCanon) {
+    if (lookup.byCanon.hasOwnProperty(k) && normalizeBracketTeamKey(k) === norm) return lookup.byCanon[k];
+  }
+  return { name: name, elo: 1500 };
+}
+
+function assignSweet16Matchups(root, matchups, bracketData) {
+  var lookup = buildBracketTeamLookup(bracketData);
+  var parents = collectNodes(root).filter(function(n) {
+    return n.round === 4 && n.children && n.children.length === 2;
+  });
+  if (parents.length !== 8 || !matchups) return;
+
+  function applyPair(parent, pair) {
+    var ch = parent.children.slice().sort(function(a, b) { return a.gid - b.gid; });
+    var t0 = pair && pair[0] ? resolveTeamFromBracket(String(pair[0]), lookup) : { name: 'Unknown', elo: 1500 };
+    var t1 = pair && pair[1] ? resolveTeamFromBracket(String(pair[1]), lookup) : { name: 'Unknown', elo: 1500 };
+    ch[0].team = t0;
+    ch[1].team = t1;
+  }
+
+  /* Region-keyed JSON aligns with the 64-team flat bracket: east top-left, south bottom-left, west top-right, midwest bottom-right. */
+  if (typeof matchups === 'object' && !Array.isArray(matchups) && matchups.east) {
+    var regionOrder = ['east', 'south', 'west', 'midwest'];
+    for (var ri = 0; ri < regionOrder.length; ri++) {
+      var reg = regionOrder[ri];
+      var pairs = matchups[reg];
+      if (!pairs || !pairs.length) continue;
+      var regParents = parents.filter(function(p) {
+        var c0 = p.children[0];
+        var c1 = p.children[1];
+        return c0 && c1 && c0.region === reg && c1.region === reg;
+      });
+      regParents.sort(function(a, b) {
+        var ma = Math.min(a.children[0].gid, a.children[1].gid);
+        var mb = Math.min(b.children[0].gid, b.children[1].gid);
+        /* East & Midwest use slotToY(slotsPerRegion-1-i): smaller min gid = lower on screen; larger min gid = top pair. */
+        if (reg === 'east' || reg === 'midwest') return mb - ma;
+        return ma - mb;
+      });
+      for (var j = 0; j < regParents.length && j < pairs.length; j++) {
+        applyPair(regParents[j], pairs[j]);
+      }
+    }
+    return;
+  }
+
+  /* Legacy: flat array of 8 pairs in global min-child-gid order (south, west, midwest, east by gid). */
+  if (Array.isArray(matchups) && matchups.length === 8) {
+    parents.sort(function(a, b) {
+      var ma = Math.min(a.children[0].gid, a.children[1].gid);
+      var mb = Math.min(b.children[0].gid, b.children[1].gid);
+      return ma - mb;
+    });
+    for (var i = 0; i < 8; i++) {
+      applyPair(parents[i], matchups[i]);
+    }
+  }
+}
+
 /**
  * Serialize bracket state for export.
  * Returns { version, advances, grayed } where advances is { gid: teamName },
@@ -438,10 +567,11 @@ function serializeState(root, grayedTeams) {
 /**
  * Build map of team name -> team object from leaf nodes.
  */
-function buildTeamNameToTeam(allNodes) {
+function buildTeamNameToTeam(allNodes, size) {
+  var lr = getLeafRound(size || 64);
   var map = {};
   allNodes.forEach(function(n) {
-    if (n.round === 1 && n.team && n.team.name) {
+    if (n.round === lr && n.team && n.team.name) {
       map[n.team.name] = n.team;
     }
   });
@@ -483,7 +613,7 @@ function validateState(state, allNodes) {
 /**
  * Apply imported state to bracket. Call currentUpdate() after.
  */
-function applyState(root, grayedTeams, state, allNodes) {
+function applyState(root, grayedTeams, state, allNodes, size) {
   var valid = validateState(state, allNodes);
   if (!valid.valid) return valid;
 
@@ -509,7 +639,7 @@ function applyState(root, grayedTeams, state, allNodes) {
     }
   }
 
-  var teamNameToTeam = buildTeamNameToTeam(allNodes);
+  var teamNameToTeam = buildTeamNameToTeam(allNodes, size);
   var gidToNode = {};
   allNodes.forEach(function(n) { gidToNode[n.gid] = n; });
 
@@ -773,6 +903,7 @@ function isBurnedAtRound(grayedTeams, teamName, round) {
 function render(root, allNodes, container, width, height, grayedTeams, size) {
   grayedTeams = grayedTeams || new Map();
   size = size || 64;
+  var leafRound = getLeafRound(size);
   d3.select(container).selectAll('*').remove();
 
   var svg = d3.select(container)
@@ -847,7 +978,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
 
     var cellNodes = allNodes.filter(function(node) {
       return node.px != null && node.py != null &&
-        (node.team || node.round === 1 || isFrontierMatchup(node, size));
+        (node.team || node.round === leafRound || isFrontierMatchup(node, size));
     });
     var cells = cellsGroup.selectAll('g.team-cell').data(cellNodes, function(d) { return d.gid; });
 
@@ -856,7 +987,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
 
     function addCellContent(g, node) {
       var team = node.team;
-      var isRound1 = node.round === 1;
+      var isLeafRoundCell = node.round === leafRound;
       var isFrontier = hasElo && isFrontierMatchup(node, size);
 
       if (isFrontier) {
@@ -914,7 +1045,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
         .attr('preserveAspectRatio', 'xMidYMid meet')
         .on('error', function() {
           d3.select(this).remove();
-          if (!isRound1) {
+          if (!isLeafRoundCell) {
             g.append('text')
               .attr('class', 'logo-fallback')
               .attr('x', CELL_WIDTH / 2)
@@ -926,7 +1057,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
               .text(team.name);
           }
         });
-      if (isRound1) {
+      if (isLeafRoundCell) {
         img.attr('x', 2).attr('y', 2);
       } else {
         img.attr('x', (CELL_WIDTH - LOGO_SIZE) / 2).attr('y', (CELL_HEIGHT - LOGO_SIZE) / 2);
@@ -954,10 +1085,10 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
     cellEnter.each(function(node) {
       var g = d3.select(this);
       addCellContent(g, node);
-      var seed = node.round === 1 ? getSeedForGid(node.gid) : '';
+      var seed = node.round === leafRound ? getSeedForGid(node.gid) : '';
       var isFrontier = isFrontierMatchup(node, size);
       var label = !isFrontier && node.team ? (seed ? seed + ' ' + node.team.name : node.team.name) : (seed ? seed + ' TBD' : '');
-      if (node.round === 1) {
+      if (node.round === leafRound) {
         g.append('text')
           .attr('class', 'seed-label')
           .attr('x', node.team ? 28 : 6)
@@ -1031,7 +1162,7 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
         if (node.team || isFrontier) {
           addCellContent(g, node);
         }
-        if (node.round === 1) {
+        if (node.round === leafRound) {
           var seed = getSeedForGid(node.gid);
           var label = !isFrontier && node.team ? (seed ? seed + ' ' + node.team.name : node.team.name) : (seed ? seed + ' TBD' : '');
           var labelEl = g.select('text.seed-label');
@@ -1052,7 +1183,8 @@ function render(root, allNodes, container, width, height, grayedTeams, size) {
     });
 
     labelsGroup.selectAll('*').remove();
-    var rightEdge = width - 12 - 80;
+    var labelInset = isCompactS16Layout(size) ? 48 : 80;
+    var rightEdge = width - 12 - labelInset;
     var labelOffset = CELL_WIDTH / 2 + 25;
     var labelData = [
       { text: 'East', x: 14, y: height * 0.25, rot: -90 },
@@ -1146,6 +1278,13 @@ var LEGEND_HEIGHT = 100;
 
 function getBracketDimensions() {
   var controlsHeight = 52;
+  if (typeof window !== 'undefined' && window.FLAT_BRACKET_COMPACT) {
+    /* ~½ the linear size of the default min canvas (600×400 vs 1200×800); cells/fonts unchanged. */
+    return {
+      width: Math.min(820, Math.max(580, window.innerWidth * 0.52)),
+      height: Math.min(520, Math.max(400, window.innerHeight - controlsHeight))
+    };
+  }
   return {
     width: Math.max(1200, window.innerWidth),
     height: Math.max(800, window.innerHeight - controlsHeight)
@@ -1162,15 +1301,18 @@ function main(teams, size) {
 
   var root = buildtree(teams, size);
   setParents(root, null);
+  if (size === 16 && window.__sweet16MatchupsRaw && window.__sweet16BracketJson) {
+    assignSweet16Matchups(root, window.__sweet16MatchupsRaw, window.__sweet16BracketJson);
+  }
   var allNodes = collectNodes(root);
-  computePositions(root, width, contentHeight);
+  computePositions(root, width, contentHeight, size);
 
   var currentUpdate = render(root, allNodes, '#bracket', width, height, grayedTeams, size);
 
   window.addEventListener('resize', function onResize() {
     var d = getBracketDimensions();
     var ch = d.height - (size === 64 ? LEGEND_HEIGHT : 0);
-    computePositions(root, d.width, ch);
+    computePositions(root, d.width, ch, size);
     currentUpdate = render(root, allNodes, '#bracket', d.width, d.height, grayedTeams, size);
   });
 
@@ -1204,7 +1346,7 @@ function main(teams, size) {
     return serializeState(root, grayedTeams);
   };
   window.bracketImportState = function(state) {
-    var result = applyState(root, grayedTeams, state, allNodes);
+    var result = applyState(root, grayedTeams, state, allNodes, size);
     if (result.valid) {
       currentUpdate();
       return { success: true };
@@ -1254,20 +1396,39 @@ var fullTeams = null;
 setupProbTableSorting();
 setupCopyTableCsv();
 
-queue()
-  .defer(d3.json, '../bracket.json')
-  .await(function(err, data) {
-    if (err || !data) {
-      d3.json('../teams.json', function(e2, t) {
-        fullTeams = t ? loadTeams(t) : loadTeams({});
-        main(fullTeams, 64);
-      });
-    } else {
-      fullTeams = (data.south && typeof data.south['1'] === 'object' && data.south['1'].name)
-        ? data : loadTeams(data);
-      main(fullTeams, 64);
-    }
-  });
+function runDefaultFlatBracketBoot() {
+  var sz = typeof window.FLAT_BRACKET_SIZE === 'number' ? window.FLAT_BRACKET_SIZE : 64;
+  if (sz === 16 && window.__sweet16MatchupsRaw && window.__sweet16BracketJson) {
+    var d = window.__sweet16BracketJson;
+    fullTeams = (d.south && typeof d.south['1'] === 'object' && d.south['1'].name)
+      ? loadTeams(d) : loadTeams(d || {});
+    main(fullTeams, 16);
+    return;
+  }
+  queue()
+    .defer(d3.json, '../bracket.json')
+    .await(function(err, data) {
+      if (err || !data) {
+        d3.json('../teams.json', function(e2, t) {
+          fullTeams = t ? loadTeams(t) : loadTeams({});
+          main(fullTeams, sz);
+        });
+      } else {
+        fullTeams = (data.south && typeof data.south['1'] === 'object' && data.south['1'].name)
+          ? loadTeams(data) : loadTeams(data);
+        main(fullTeams, sz);
+      }
+    });
+}
+
+if (typeof window !== 'undefined') {
+  window.runDefaultFlatBracketBoot = runDefaultFlatBracketBoot;
+}
+if (typeof window !== 'undefined' && window.FLAT_BRACKET_SKIP_DEFAULT_BOOT) {
+  /* flat_bracket_s16 loads matchups then calls runDefaultFlatBracketBoot() */
+} else {
+  runDefaultFlatBracketBoot();
+}
 
 document.getElementById('resetBtn').onclick = function() {
   if (window.bracketReset) window.bracketReset();

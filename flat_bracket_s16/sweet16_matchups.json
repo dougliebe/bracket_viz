@@ -1,0 +1,18 @@
+{
+  "east": [
+    ["Duke", "St John's"],
+    ["Michigan St", "UConn"]
+  ],
+  "south": [
+    ["Iowa", "Nebraska"],
+    ["Illinois", "Houston"]
+  ],
+  "west": [
+    ["Arizona", "Arkansas"],
+    ["Texas", "Purdue"]
+  ],
+  "midwest": [
+    ["Michigan", "Alabama"],
+    ["Tennessee", "Iowa St"]
+  ]
+}

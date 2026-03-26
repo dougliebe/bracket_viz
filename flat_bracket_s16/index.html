@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flat Bracket — Sweet 16+</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; }
+    .controls {
+      padding: 12px 20px;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+    .controls button {
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+    }
+    .controls button:hover { background: #1d4ed8; }
+    #bracket {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 0;
+      padding: 4px 8px 12px;
+      overflow: auto;
+    }
+    .team-cell {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .team-cell:hover rect {
+      fill: #f0f9ff !important;
+    }
+    .team-cell text.seed-label,
+    .team-cell text.logo-fallback {
+      fill: #333333;
+    }
+    .sim-tooltip {
+      position: fixed;
+      z-index: 1000;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 12px;
+      border-radius: 6px;
+      pointer-events: none;
+      display: none;
+      max-width: 220px;
+      line-height: 1.4;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .sim-tooltip.visible {
+      display: block;
+    }
+    .import-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      background: rgba(0,0,0,0.4);
+      align-items: center;
+      justify-content: center;
+    }
+    .import-modal.visible {
+      display: flex;
+    }
+    .import-modal-content {
+      background: #fff;
+      padding: 24px;
+      border-radius: 8px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .import-modal h3 { margin: 0 0 12px 0; font-size: 18px; }
+    .import-modal textarea {
+      width: 100%;
+      height: 120px;
+      margin: 8px 0 12px 0;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .import-modal .import-error { color: #dc2626; font-size: 13px; margin-bottom: 8px; }
+    .import-modal .import-buttons { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .import-modal .import-buttons button { flex: 1; min-width: 80px; }
+    .import-modal .file-input-wrap { margin: 8px 0 12px 0; }
+    #probTableWrap {
+      display: none;
+      padding: 20px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      justify-content: center;
+    }
+    #probTableWrap.visible { display: flex; flex-direction: column; align-items: center; }
+    #probTableWrap .prob-table-toolbar {
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: fit-content;
+    }
+    #probTable {
+      width: auto;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    #probTable th, #probTable td {
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    #probTable th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    #probTable th:hover { background: #e2e8f0; }
+    #probTable th.sorted-asc::after { content: ' \2191'; font-size: 11px; color: #64748b; }
+    #probTable th.sorted-desc::after { content: ' \2193'; font-size: 11px; color: #64748b; }
+    #probTable td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    #probTable .prob-team-cell { display: flex; align-items: center; gap: 8px; }
+    #probTable .team-logo {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button id="resetBtn">Reset</button>
+    <button id="randomBtn">Random</button>
+    <button id="exportBtn">Export</button>
+    <button id="importBtn">Import</button>
+    <button id="simulateBtn">Run 100k Simulations</button>
+    <span id="simulateStatus"></span>
+    <span>Click a team to advance them. Ctrl+click to gray out that team from that round forward (toggle).</span>
+  </div>
+  <div id="bracket"></div>
+  <div id="probTableWrap">
+    <div class="prob-table-toolbar">
+      <button id="copyTableCsvBtn">Copy as CSV</button>
+    </div>
+    <table id="probTable">
+      <thead>
+        <tr>
+          <th data-sort="team">Team</th>
+          <th data-sort="r32" class="num">Round of 32</th>
+          <th data-sort="s16" class="num">Sweet 16</th>
+          <th data-sort="e8" class="num">Elite 8</th>
+          <th data-sort="f4" class="num">Final Four</th>
+          <th data-sort="champ" class="num">Reach championship</th>
+          <th data-sort="win" class="num">Win it all</th>
+          <th data-sort="futureValue" class="num">Future value</th>
+          <th data-sort="loseR32" class="num">P(win R64, lose R32)</th>
+          <th data-sort="loseS16" class="num">P(win R32, lose S16)</th>
+          <th data-sort="loseR32orS16" class="num">P(lose in R32 or S16)</th>
+          <th data-sort="loseE8" class="num">P(win S16, lose E8)</th>
+          <th data-sort="loseF4" class="num">P(win E8, lose F4)</th>
+          <th data-sort="loseFinal" class="num">P(win F4, lose Final)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div id="simTooltip" class="sim-tooltip"></div>
+
+  <div id="importModal" class="import-modal">
+    <div class="import-modal-content">
+      <h3>Import Bracket State</h3>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: #555;">Paste JSON or choose a file:</p>
+      <div class="file-input-wrap">
+        <input type="file" id="importFileInput" accept=".json,application/json" style="font-size: 13px;">
+      </div>
+      <textarea id="importPasteArea" placeholder='Paste JSON here, e.g. {"version":1,"advances":{"65":"Auburn",...},"grayed":{"TeamA":3,"TeamB":5}}'></textarea>
+      <div id="importError" class="import-error" style="display: none;"></div>
+      <div class="import-buttons">
+        <button id="importApplyBtn">Apply</button>
+        <button id="importCancelBtn" style="background: #6b7280;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+  <script src="https://d3js.org/queue.v1.min.js"></script>
+  <script>
+    window.FLAT_BRACKET_SIZE = 16;
+    window.FLAT_BRACKET_COMPACT = true;
+    window.FLAT_BRACKET_SKIP_DEFAULT_BOOT = true;
+  </script>
+  <script src="../flat_bracket/simulation.js"></script>
+  <script src="../flat_bracket/flat_bracket.js"></script>
+  <script>
+    queue()
+      .defer(d3.json, '../bracket.json')
+      .defer(d3.json, 'sweet16_matchups.json')
+      .await(function(err, bracketData, matchups) {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        window.__sweet16BracketJson = bracketData;
+        window.__sweet16MatchupsRaw = matchups;
+        if (window.runDefaultFlatBracketBoot) window.runDefaultFlatBracketBoot();
+      });
+  </script>
+</body>
+</html>

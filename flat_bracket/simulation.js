@@ -6,8 +6,30 @@
 (function(global) {
   'use strict';
 
-  var N_TEAMS = 64;
   var N_ROUNDS = 6;
+
+  function getLeafNodes(allNodes) {
+    var leaves = [];
+    for (var i = 0; i < allNodes.length; i++) {
+      var n = allNodes[i];
+      if (!n.children || n.children.length === 0) leaves.push(n);
+    }
+    leaves.sort(function(a, b) { return a.gid - b.gid; });
+    return leaves;
+  }
+
+  function detectBracketMeta(allNodes) {
+    var leaves = getLeafNodes(allNodes);
+    var n = leaves.length;
+    if (n < 2 || (n & (n - 1)) !== 0) return null;
+    var leafRound = leaves[0].round;
+    for (var i = 1; i < leaves.length; i++) {
+      if (leaves[i].round !== leafRound) return null;
+    }
+    var nRounds = Math.round(Math.log(n) / Math.LN2);
+    if (Math.pow(2, nRounds) !== n) return null;
+    return { leaves: leaves, leafRound: leafRound, nTeams: n, nRounds: nRounds };
+  }
 
   function eloWinProb(eloA, eloB) {
     if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return 0.5;
@@ -19,6 +41,14 @@
    * rounds[r] = array of [slotA, slotB] pairs for round r (1-based).
    */
   function buildRoundsFromTree(allNodes) {
+    var meta = detectBracketMeta(allNodes);
+    if (!meta) return null;
+    var leafRound = meta.leafRound;
+    var nRounds = meta.nRounds;
+    var leaves = meta.leaves;
+    var gidToSlot = {};
+    for (var li = 0; li < leaves.length; li++) gidToSlot[leaves[li].gid] = li;
+
     var rounds = {};
     var nodesByRound = {};
     for (var i = 0; i < allNodes.length; i++) {
@@ -30,21 +60,25 @@
       nodesByRound[r].sort(function(a, b) { return a.gid - b.gid; });
     }
 
-    var round2Nodes = nodesByRound[2] || [];
+    var parentsFirst = nodesByRound[leafRound + 1] || [];
     var pairs1 = [];
-    for (var j = 0; j < round2Nodes.length; j++) {
-      var n2 = round2Nodes[j];
+    for (var j = 0; j < parentsFirst.length; j++) {
+      var n2 = parentsFirst[j];
       var c0 = n2.children && n2.children[0];
       var c1 = n2.children && n2.children[1];
-      if (c0 && c1) pairs1.push([c0.gid - 1, c1.gid - 1]);
+      if (c0 && c1) {
+        var s0 = gidToSlot[c0.gid];
+        var s1 = gidToSlot[c1.gid];
+        if (s0 != null && s1 != null) pairs1.push([s0, s1]);
+      }
     }
     rounds[1] = pairs1;
 
     var nodeToSlot = {};
-    for (var k = 0; k < round2Nodes.length; k++) nodeToSlot[round2Nodes[k].gid] = k;
+    for (var k = 0; k < parentsFirst.length; k++) nodeToSlot[parentsFirst[k].gid] = k;
 
-    for (var round = 2; round <= N_ROUNDS; round++) {
-      var parentNodes = nodesByRound[round + 1] || [];
+    for (var round = 2; round <= nRounds; round++) {
+      var parentNodes = nodesByRound[leafRound + round] || [];
       parentNodes.sort(function(a, b) { return a.gid - b.gid; });
       var pairs = [];
       for (var p = 0; p < parentNodes.length; p++) {
@@ -69,15 +103,9 @@
    * Returns { teams: string[], elos: number[], teamIndexByName: {} } or null if invalid.
    */
   function extractState(allNodes) {
-    var leafNodes = [];
-    for (var i = 0; i < allNodes.length; i++) {
-      var n = allNodes[i];
-      if (n.round === 1 && n.gid >= 1 && n.gid <= N_TEAMS) {
-        leafNodes.push(n);
-      }
-    }
-    leafNodes.sort(function(a, b) { return a.gid - b.gid; });
-    if (leafNodes.length !== N_TEAMS) return null;
+    var meta = detectBracketMeta(allNodes);
+    if (!meta) return null;
+    var leafNodes = meta.leaves;
 
     var teams = [];
     var elos = [];
@@ -91,7 +119,7 @@
       elos.push(elo);
       teamIndexByName[name] = j;
     }
-    return { teams: teams, elos: elos, teamIndexByName: teamIndexByName };
+    return { teams: teams, elos: elos, teamIndexByName: teamIndexByName, nRounds: meta.nRounds };
   }
 
   function getSibling(node) {
@@ -156,6 +184,7 @@
       teams: fullState.teams,
       elos: fullState.elos,
       teamIndexByName: fullState.teamIndexByName,
+      nRounds: fullState.nRounds,
       alreadyEliminated: alreadyEliminated,
       isPartial: hasAdvances
     };
@@ -255,7 +284,8 @@
    * Run nsims simulations. Returns raw counts for merging.
    * rounds: from buildRoundsFromTree(allNodes)
    */
-  function runSimulations(teams, elos, nsims, rounds) {
+  function runSimulations(teams, elos, nsims, rounds, nRounds) {
+    nRounds = nRounds || N_ROUNDS;
     var n = teams.length;
     var exitCounts = [];
     for (var t = 0; t < n; t++) {
@@ -267,7 +297,7 @@
       var currentIds = [];
       for (var i = 0; i < n; i++) currentIds.push(i);
 
-      for (var r = 1; r <= N_ROUNDS; r++) {
+      for (var r = 1; r <= nRounds; r++) {
         var pairs = rounds[r];
         var winners = [];
         for (var g = 0; g < pairs.length; g++) {
@@ -290,9 +320,27 @@
   }
 
   /**
-   * Convert raw exitCounts to reachAtLeast, roundExit, winRoundLoseNext.
+   * Map 4-round worker exits (lose S16 … lose final) onto table keys r1–r6 (R64 … final).
    */
-  function buildOutputs(teams, exitCounts, nsims) {
+  function padExitCountsForFullTable(counts, nSimRounds, fromPartial) {
+    if (fromPartial || nSimRounds === 6) return counts;
+    if (nSimRounds !== 4) return counts;
+    var a = counts[1] || 0, b = counts[2] || 0, c = counts[3] || 0, d = counts[4] || 0;
+    return {
+      1: 0, 2: 0, 3: a, 4: b, 5: c, 6: d,
+      champ: counts.champ || 0
+    };
+  }
+
+  /**
+   * Convert raw exitCounts to reachAtLeast, roundExit, winRoundLoseNext.
+   * opts: { nSimRounds, fromPartial }
+   */
+  function buildOutputs(teams, exitCounts, nsims, opts) {
+    opts = opts || {};
+    var nSimRounds = opts.nSimRounds != null ? opts.nSimRounds : 6;
+    var fromPartial = !!opts.fromPartial;
+
     var reachAtLeast = {};
     var roundExit = {};
     var winRoundLoseNext = {};
@@ -300,7 +348,7 @@
 
     for (var t = 0; t < n; t++) {
       var name = teams[t];
-      var counts = exitCounts[t];
+      var counts = padExitCountsForFullTable(exitCounts[t], nSimRounds, fromPartial);
       var r1 = counts[1] || 0, r2 = counts[2] || 0, r3 = counts[3] || 0;
       var r4 = counts[4] || 0, r5 = counts[5] || 0, r6 = counts[6] || 0;
       var champ = counts.champ || 0;
@@ -331,7 +379,8 @@
       reachAtLeast: reachAtLeast,
       roundExit: roundExit,
       winRoundLoseNext: winRoundLoseNext,
-      nsims: nsims
+      nsims: nsims,
+      nSimRounds: nSimRounds
     };
   }
 
@@ -356,8 +405,9 @@
   /**
    * Run nsims using Web Workers. Returns a Promise that resolves to outputs.
    */
-  function runWithWorkers(teams, elos, nsims, rounds, workerUrl, seed) {
+  function runWithWorkers(teams, elos, nsims, rounds, workerUrl, seed, nRounds) {
     seed = seed || 12345;
+    var nRoundsMsg = nRounds != null ? nRounds : N_ROUNDS;
     var nWorkers = Math.min(4, typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 4);
     nWorkers = Math.min(nWorkers, Math.ceil(nsims / 100));
     var chunkSize = Math.ceil(nsims / nWorkers);
@@ -376,7 +426,7 @@
         done++;
         if (done === nWorkers && !hasError) {
           var merged = mergeExitCounts(teams, results);
-          var result = buildOutputs(teams, merged, nsims);
+          var result = buildOutputs(teams, merged, nsims, { nSimRounds: nRoundsMsg, fromPartial: false });
           resolve(result);
         }
       }
@@ -399,6 +449,7 @@
             elos: elos,
             nsims: chunks[i],
             rounds: rounds,
+            nRounds: nRoundsMsg,
             workerId: i,
             seed: seed
           });
@@ -420,14 +471,14 @@
     nsims = nsims || 100000;
     var state = extractPartialState(allNodes);
     if (!state) {
-      var err = { error: 'Invalid bracket state: need 64 teams in round 1' };
+      var err = { error: 'Invalid bracket state: need a power-of-two number of leaf teams' };
       if (callback) callback(err);
       return err;
     }
 
     if (state.isPartial) {
       var exitCounts = runPartialSimulations(allNodes, state, nsims);
-      var result = buildOutputs(state.teams, exitCounts, nsims);
+      var result = buildOutputs(state.teams, exitCounts, nsims, { fromPartial: true });
       result.fromPartialState = true;
       if (callback) {
         setTimeout(function() { callback(null, result); }, 0);
@@ -443,6 +494,8 @@
       return err;
     }
 
+    var nRounds = state.nRounds != null ? state.nRounds : Math.round(Math.log(state.teams.length) / Math.LN2);
+
     if (typeof callback === 'function') {
       var scripts = typeof document !== 'undefined' && document.getElementsByTagName('script');
       var workerUrl = 'simulation-worker.js';
@@ -453,14 +506,14 @@
           break;
         }
       }
-      runWithWorkers(state.teams, state.elos, nsims, rounds, workerUrl)
+      runWithWorkers(state.teams, state.elos, nsims, rounds, workerUrl, undefined, nRounds)
         .then(function(result) { callback(null, result); })
         .catch(function(err) { callback(err, null); });
       return undefined;
     }
 
-    var exitCounts = runSimulations(state.teams, state.elos, nsims, rounds);
-    return buildOutputs(state.teams, exitCounts, nsims);
+    var exitCounts = runSimulations(state.teams, state.elos, nsims, rounds, nRounds);
+    return buildOutputs(state.teams, exitCounts, nsims, { nSimRounds: nRounds, fromPartial: false });
   }
 
   global.BracketSimulation = {

@@ -6,7 +6,7 @@
 
 'use strict';
 
-var N_ROUNDS = 6;
+var DEFAULT_N_ROUNDS = 6;
 
 function eloWinProb(eloA, eloB) {
   if (!Number.isFinite(eloA) || !Number.isFinite(eloB)) return 0.5;
@@ -24,7 +24,8 @@ function createRng(seed) {
   };
 }
 
-function runSimulations(teams, elos, nsims, rounds, random) {
+function runSimulations(teams, elos, nsims, rounds, random, nRounds) {
+  nRounds = nRounds || DEFAULT_N_ROUNDS;
   var n = teams.length;
   var exitCounts = [];
   for (var t = 0; t < n; t++) {
@@ -35,7 +36,7 @@ function runSimulations(teams, elos, nsims, rounds, random) {
     var currentIds = [];
     for (var i = 0; i < n; i++) currentIds.push(i);
 
-    for (var r = 1; r <= N_ROUNDS; r++) {
+    for (var r = 1; r <= nRounds; r++) {
       var pairs = rounds[r];
       var winners = [];
       for (var g = 0; g < pairs.length; g++) {
@@ -63,12 +64,13 @@ self.onmessage = function(e) {
   var elos = data.elos;
   var nsims = data.nsims || 0;
   var rounds = data.rounds;
+  var nRounds = data.nRounds != null ? data.nRounds : DEFAULT_N_ROUNDS;
   var workerId = data.workerId || 0;
   var seed = (data.seed || 12345) + workerId * 1000000;
 
   if (!rounds) return;
   var random = createRng(seed);
-  var exitCounts = runSimulations(teams, elos, nsims, rounds, random);
+  var exitCounts = runSimulations(teams, elos, nsims, rounds, random, nRounds);
 
   self.postMessage({ exitCounts: exitCounts, teams: teams });
 };
